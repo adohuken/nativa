@@ -1,0 +1,242 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum LanguageSkill {
+  LISTENING
+  SPEAKING
+  READING
+  WRITING
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ExerciseType {
+  COMPREHENSIBLE_INPUT_GIST   // Input puro audiovisual (Listening/Reading sin análisis sintáctico)
+  PHONETIC_SHADOWING          // Práctica de pronunciación guiada (Speaking)
+  GRAMMAR_IN_ACTION           // Gramática inductiva implícita
+  MONITOR_CORRECTION          // Fase de edición/monitor consciente (Krashen Monitor Model)
+  FREE_SPEECH_PROMPT          // Producción oral espontánea
+}
+
+// ============================================================================
+// AUTENTICACIÓN Y PERFILES DE USUARIO
+// ============================================================================
+
+model User {
+  id              String               @id @default(uuid())
+  email           String               @unique
+  passwordHash    String
+  role            UserRole             @default(STUDENT)
+  isEmailVerified Boolean              @default(false)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  profile             Profile?
+  refreshTokens       RefreshToken[]
+  lessonProgress      UserLessonProgress[]
+  skillMasteries      UserSkillMastery[]
+  speakingSubmissions SpeakingHistory[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Profile {
+  id                 String    @id @default(uuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  nativeLanguageCode String
+  nativeLanguage     Language  @relation("NativeSpeaker", fields: [nativeLanguageCode], references: [code])
+  
+  targetLanguageCode String
+  targetLanguage     Language  @relation("TargetLearner", fields: [targetLanguageCode], references: [code])
+
+  avatarUrl          String?
+  dailyGoalMinutes   Int       @default(15)
+  dailyStreak        Int       @default(0)
+  lastActiveAt       DateTime?
+  
+  // Krashen Affective Filter Settings
+  zenModeEnabled       Boolean   @default(true) // Desactiva temporizadores agresivos
+  soundFeedbackEnabled Boolean   @default(true)
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("profiles")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRevoked])
+  @@map("refresh_tokens")
+}
+
+// ============================================================================
+// CURRÍCULO ESTRUCTURADO Y MODELADO DE CONTENIDO (i + 1)
+// ============================================================================
+
+model Language {
+  code           String             @id // 'en', 'es', 'fr', etc.
+  name           String
+  isActive       Boolean            @default(true)
+
+  nativeProfiles Profile[]          @relation("NativeSpeaker")
+  targetProfiles Profile[]          @relation("TargetLearner")
+  modules        CourseModule[]
+  skillMasteries UserSkillMastery[]
+
+  @@map("languages")
+}
+
+model CourseModule {
+  id           String      @id @default(uuid())
+  languageCode String
+  language     Language    @relation(fields: [languageCode], references: [code])
+  level        CefrLevel   // A1 -> C2
+  title        String
+  description  String
+  orderIndex   Int
+  lessons      Lesson[]
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([languageCode, level, orderIndex])
+  @@map("course_modules")
+}
+
+model Lesson {
+  id          String         @id @default(uuid())
+  moduleId    String
+  module      CourseModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title       String
+  orderIndex  Int
+  
+  // Comprehensible Input Context
+  contextTheme String        // Ej. "Ordering at a Café in London"
+  targetSkill  LanguageSkill // Habilidad primordial trabajada (para desatascar cuellos de botella)
+
+  sections    LessonSection[]
+  progress    UserLessonProgress[]
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([moduleId, orderIndex])
+  @@index([targetSkill])
+  @@map("lessons")
+}
+
+model LessonSection {
+  id          String       @id @default(uuid())
+  lessonId    String
+  lesson      Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  type        ExerciseType
+  orderIndex  Int
+  
+  // Contenido Pedagógico
+  inputData   Json         // Texto, Audio URLs, Scripts de Inmersión, Vocabulario incidental
+  metadata    Json?        // Guías opcionales para la fase de Monitor (explicaciones diferidas)
+
+  createdAt   DateTime     @default(now())
+
+  @@unique([lessonId, orderIndex])
+  @@map("lesson_sections")
+}
+
+// ============================================================================
+// MOTOR DE PROGRESO AISLADO POR USUARIO (USER PROGRESS & MASTERY)
+// ============================================================================
+
+model UserSkillMastery {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languageCode String
+  language     Language      @relation(fields: [languageCode], references: [code])
+  
+  skill        LanguageSkill // LISTENING, SPEAKING, READING, WRITING
+  currentLevel CefrLevel     @default(A1)
+  masteryScore Float         @default(0.0) // 0.0 a 100.0 (Score bayesiano de proficiencia)
+
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([userId, languageCode, skill])
+  @@index([userId, languageCode])
+  @@map("user_skill_masteries")
+}
+
+model UserLessonProgress {
+  id          String         @id @default(uuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  status      ProgressStatus @default(NOT_STARTED)
+  score       Float          @default(0.0)
+  completedAt DateTime?
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([userId, status])
+  @@map("user_lesson_progress")
+}
+
+model SpeakingHistory {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  audioRecordingUrl   String?   // Ubicación en S3/Cloud Storage
+  promptText          String
+  transcript          String?   // Resultado del motor STT (Whisper/Google Speech)
+  pronunciationScore  Float     // 0.0 a 100.0 calculado por motor fonético
+  phoneticFeedback    Json?     // Segmentos de fonemas con desviaciones
+
+  createdAt           DateTime  @default(now())
+
+  @@index([userId])
+  @@map("speaking_history")
+}

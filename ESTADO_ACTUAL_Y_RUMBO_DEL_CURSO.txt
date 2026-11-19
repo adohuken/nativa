@@ -1,0 +1,389 @@
+================================================================================
+ESTADO ACTUAL, RUMBO PEDAGÓGICO Y MAPA DE RUTAS DE FLUENTIA (MCER A1 → C2)
+Auditoría Completa del Currículo, Arquitectura de Nodos y Metodología SLA Krashen
+Generado para: David Abarca • Proyecto English
+Fecha de Actualización: 19 de Noviembre de 2026
+================================================================================
+
+--------------------------------------------------------------------------------
+1. RESUMEN EJECUTIVO: LA PLATAFORMA FLUENTIA HOY
+--------------------------------------------------------------------------------
+Fluentia es un ecosistema integral de adquisición acelerada del idioma inglés que
+fusiona tres pilares científicos y pedagógicos de vanguardia:
+
+1. TEORÍA DE ADQUISICIÓN DE SEGUNDAS LENGUAS (SLA - Stephen Krashen):
+   - Input Comprensible i+1: Exposición masiva a significado en contexto real.
+   - Filtro Afectivo Zen: Sin vidas punitivas, sin castigo por error, sin ansiedad.
+   - Orden Natural de Adquisición: El estudiante primero comprende e interioriza;
+     el "Monitor" gramatical reflexivo solo interviene como Noticing opcional.
+   - Fonética IPA + Shadowing: Sustitución de fonética figurativa por IPA simplificado,
+     audio nativo y visualizador de forma de onda sin estrés.
+
+2. ARQUITECTURA DE NODOS MADRE Y TRÍADA DE INMERSIÓN:
+   - 24 Nodos Madre (4 por nivel MCER) que estructuran el camino principal.
+   - 72 Sub-Nodos de Inmersión (3 por cada Nodo Madre):
+     * Sub-Nodo A (Reading): Lecturas graduadas (200-500 palabras) con Click-to-Define,
+       contador de palabras en tiempo real, pronunciación nativa y botón de estrella ⭐.
+     * Sub-Nodo B (Listening): Escucha receptiva pasiva sin evaluación punitiva de voz,
+       con transcripción sincronizada y cápsula cultural.
+     * Sub-Nodo C (SRS): Mini-sesión de repaso espaciado con algoritmo de retención.
+   - Regla de Desbloqueo Estricta: Cada lección madre desbloquea sus 3 sub-nodos;
+     el siguiente nodo madre permanece bloqueado hasta completar los 3 sub-nodos.
+
+3. GAMIFICACIÓN DE AVENTURA (DUOLINGO PRO) + TBLT UNIVERSITARIO:
+   - Camino serpenteante y fluido con nodos circulares 3D (80x80px) e iconos temáticos.
+   - Popovers flotantes con toda la información al pasar el ratón o hacer clic.
+   - Sidebar con Gráfico de Radar (Spider Chart) midiendo las 4 destrezas SLA:
+     Listening (Audio), Speaking (Voz), Reading (Lectura), Writing (Proyectos).
+   - Misión Diaria interactiva para reforzar el área de mayor oportunidad.
+   - 6 Proyectos Capstone Universitarios evaluados por rúbricas de comunicación real.
+
+
+--------------------------------------------------------------------------------
+2. CICLO PEDAGÓGICO DE CADA NODO MADRE (LAS 6 ETAPAS INTENSIVAS)
+--------------------------------------------------------------------------------
+Cada uno de los 24 Nodos Madre sigue el ciclo de 6 etapas krashenianas:
+
+  ETAPA 1 • INMERSIÓN SONORA (Input Comprensible i+1):
+            Diálogo continuo nativo en situación real (6-8 turnos) con transcripción
+            opcional y control de velocidad (0.75x a 1.25x).
+
+  ETAPA 2 • COMPRENSIÓN GLOBAL E INFERENCIA (Gist & Inference):
+            Preguntas de intención pragmática y comprensión de fondo, no datos aislados.
+
+  ETAPA 3 • RECONSTRUYE LA HISTORIA (Significado Primero):
+            Ordenamiento de la secuencia narrativa de los eventos del diálogo.
+            La sintaxis emerge del significado global, no de bloques gramaticales aislados.
+
+  ETAPA 4 • LABORATORIO DE SHADOWING (Fonética IPA):
+            Práctica de pronunciación progresiva con feedback visual de onda y transcripción
+            IPA simplificada. Sin puntuaciones punitivas.
+
+  ETAPA 5 • NOTICING OPCIONAL (Conciencia Lingüística):
+            Tarjeta desplegable donde el alumno descubre inductivamente por qué los nativos
+            usan cierta estructura. Ejercicio de elección pragmática sin castigo.
+
+  ETAPA 6 • RETO DE DESBLOQUEO COMUNICATIVO:
+            Evaluación de maestría contextual para otorgar XP y desbloquear los sub-nodos.
+
+
+--------------------------------------------------------------------------------
+3. MAPA CURRICULAR COMPLETO DE RUTAS (MCER A1 HASTA C2)
+--------------------------------------------------------------------------------
+
+================================================================================
+NIVEL A1 • FUNDAMENTOS Y SUPERVIVENCIA UNIVERSITARIA
+Meta Comunicativa: Adquisición de la identidad, el entorno inmediato y la capacidad de interactuar en el campus.
+Proyecto Universitario Oficial (TBLT): Presentarse formal e informalmente ante la facultad y llenar formularios de admisión académica.
+================================================================================
+
+[NODO MADRE 1.1] Llegar a Londres: quién soy y de dónde vengo
+  - Subtítulo: Preséntate con naturalidad en el centro de conferencias y describe tu origen sin traducir mentalmente
+  - Escenario Real: "Llegada al Centro de Conferencias Internacional en Covent Garden, Londres."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 1.1-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 1.1-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 1.1-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 1.2] El inventario del campus: pedir y señalar lo que necesitas
+  - Subtítulo: Identifica, solicita y cataloga recursos en el laboratorio universitario
+  - Escenario Real: "En el laboratorio universitario de informática de University College London."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 1.2-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 1.2-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 1.2-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 1.3] Un día en la universidad: ritmos, rutinas y horarios
+  - Subtítulo: Coordina calendarios, hábitos de estudio y frecuencias académicas con tu equipo
+  - Escenario Real: "En la cafetería universitaria coordinando el calendario de investigación semestral."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 1.3-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 1.3-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 1.3-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 1.4] Encontrar el aula: pedir indicaciones con cortesía
+  - Subtítulo: Navega el campus, formula peticiones corteses y ubica salas y auditorios
+  - Escenario Real: "En el patio central de la universidad buscando el auditorio de ciencias."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 1.4-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 1.4-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 1.4-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+
+================================================================================
+NIVEL A2 • COMUNICACIÓN COTIDIANA Y RELATOS
+Meta Comunicativa: Narración de eventos pasados, comparación de opciones técnicas y compromisos futuros.
+Proyecto Universitario Oficial (TBLT): Redactar el reporte de una práctica de laboratorio y la biografía narrativa de un científico pionero.
+================================================================================
+
+[NODO MADRE 2.1] Mi primer fin de semana en Londres: contar qué hice
+  - Subtítulo: Narra anécdotas de viajes, lugares visitados y experiencias del fin de semana dominando el pasado simple natural
+  - Escenario Real: "En la sala común de la residencia universitaria charlando sobre el fin de semana."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 2.1-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 2.1-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 2.1-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 2.2] Compras en el campus: comparar precios y calidades
+  - Subtítulo: Compara precios, opciones de comida y materiales en las tiendas del campus con comparativos y superlativos
+  - Escenario Real: "En la tienda universitaria del campus comparando mochilas y suministros de estudio."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 2.2-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 2.2-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 2.2-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 2.3] Compromisos y planes: organizar una salida con amigos de la facultad
+  - Subtítulo: Planifica una excursión de fin de semana y asume acuerdos espontáneos con amigos (will vs going to)
+  - Escenario Real: "En la cafetería universitaria planeando una salida de fin de semana con amigos."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 2.3-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 2.3-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 2.3-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 2.4] Normas del campus: qué podemos y qué no podemos hacer
+  - Subtítulo: Comunica reglas de la residencia estudiantil, biblioteca y áreas comunes usando verbos modales
+  - Escenario Real: "Sesión de inducción con el asesor de la residencia estudiantil sobre normas del campus."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 2.4-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 2.4-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 2.4-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+
+================================================================================
+NIVEL B1 • INDEPENDENCIA Y FLUIDEZ LABORAL/TÉCNICA
+Meta Comunicativa: Conexión pasado-presente (experiencia acumulada), hipótesis condicionales y manuales operativos.
+Proyecto Universitario Oficial (TBLT): Portafolio profesional, descripción de procesos tecnológicos y análisis de contingencias de laboratorio.
+================================================================================
+
+[NODO MADRE 3.1] Mi portafolio: lo que he logrado hasta hoy
+  - Subtítulo: Conecta tus investigaciones previas con tus proyectos actuales para solicitar becas
+  - Escenario Real: "Entrevista de pasantía internacional en el Imperial College de Londres."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 3.1-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 3.1-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 3.1-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 3.2] Resolver problemas en el campus: si esto pasa, haremos aquello
+  - Subtítulo: Formula soluciones prácticas a imprevistos cotidianos y académicos evaluando causa y efecto con condicionales
+  - Escenario Real: "Resolviendo contingencias y problemas técnicos antes de la presentación final del proyecto."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 3.2-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 3.2-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 3.2-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 3.3] Evolución del entorno: cómo ha cambiado mi ciudad y universidad
+  - Subtítulo: Explica la transformación urbana y académica conectando eventos pasados con el pasado perfecto (had done)
+  - Escenario Real: "Conversando con un profesor veterano sobre la evolución histórica del campus universitario."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 3.3-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 3.3-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 3.3-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 3.4] Guía de servicios: cómo funciona el sistema de bibliotecas y transporte
+  - Subtítulo: Describe los procedimientos del campus y de la ciudad con foco objetivo usando la voz pasiva cotidiana
+  - Escenario Real: "En el mostrador de servicios estudiantiles conociendo el uso de la biblioteca y transporte urbano."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 3.4-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 3.4-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 3.4-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+
+================================================================================
+NIVEL B2 • COMPETENCIA ACADÉMICA Y ARGUMENTATIVA
+Meta Comunicativa: Estructuración de debates, evaluación contrafáctica, reporte de investigación y deducción lógica.
+Proyecto Universitario Oficial (TBLT): Ensayo argumentativo académico formal con citas bibliográficas y debate de hipótesis científicas.
+================================================================================
+
+[NODO MADRE 4.1] Estructurar un argumento: debatir ideas en comités
+  - Subtítulo: Defiende tu postura en debates estilo Oxford usando transiciones lógicas y cortesía parlamentaria
+  - Escenario Real: "Debate de la Sociedad de Unión Universitaria de Oxford sobre Inteligencia Artificial."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 4.1-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 4.1-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 4.1-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 4.2] Evaluar lo que pudo haber sido: análisis de decisiones pasadas
+  - Subtítulo: Modela escenarios retrospectivos y reflexiona sobre giros estratégicos en proyectos
+  - Escenario Real: "Estudio de caso en la Escuela de Negocios de Londres sobre el colapso de Kodak."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 4.2-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 4.2-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 4.2-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 4.3] Citar a los expertos: reportar discursos e investigaciones ajenas
+  - Subtítulo: Comunica posturas de otros científicos en simposios respetando los matices de autoría
+  - Escenario Real: "Redactando el informe ejecutivo tras la conferencia del decano de investigación."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 4.3-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 4.3-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 4.3-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 4.4] Llegar a conclusiones lógicas: deducir qué ocurrió con las pruebas
+  - Subtítulo: Reconstruye anomalías de datos empíricos y formula deducciones científicas con cautela
+  - Escenario Real: "Investigando una anomalía electromagnética en los datos del radiotelescopio."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 4.4-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 4.4-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 4.4-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+
+================================================================================
+NIVEL C1 • AVANZADO EAP (ENGLISH FOR ACADEMIC PURPOSES)
+Meta Comunicativa: Énfasis e inversión sintáctica, matiz cauteloso (hedging) en papers y diplomacia en comités.
+Proyecto Universitario Oficial (TBLT): Paper de investigación con matiz cauteloso (hedging) y propuesta formal para comités de financiamiento.
+================================================================================
+
+[NODO MADRE 5.1] El discurso que convence: cómo enfatizar sin gritar
+  - Subtítulo: Eleva la fuerza retórica de ponencias magistrales mediante cadencias solemnes y persuasión
+  - Escenario Real: "Simposio Internacional de Bioética e Inteligencia Artificial en University College London."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 5.1-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 5.1-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 5.1-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 5.2] El arte del matiz: expresar certeza cautelosa en papers
+  - Subtítulo: Atenúa afirmaciones científicas para blindar tus hallazgos ante revisores pares
+  - Escenario Real: "Comité de Ética en Ensayos Clínicos dictaminando sobre terapia génica."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 5.2-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 5.2-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 5.2-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 5.3] Reformular con impacto: destacar lo que de verdad importa
+  - Subtítulo: Dirige la atención del comité evaluador hacia los descubrimientos más disruptivos
+  - Escenario Real: "Conferencia magistral en el Royal Institute of International Affairs (Chatham House)."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 5.3-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 5.3-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 5.3-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 5.4] El tono del debate: sonar diplomático y persuasivo en comités
+  - Subtítulo: Modula afirmaciones con prudencia científica y defiende enmiendas ante revisiones ciegas
+  - Escenario Real: "Respondiendo a los comentarios de los revisores anónimos en la revista Nature Machine Intelligence."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 5.4-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 5.4-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 5.4-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+
+================================================================================
+NIVEL C2 • MAESTRÍA Y BILINGÜISMO NATIVO FUNCIONAL
+Meta Comunicativa: Negociación estratégica entre líneas, comprensión de dialectos globales y defensa de tesis doctoral.
+Proyecto Universitario Oficial (TBLT): Tesis doctoral completa, abstract publicable para revistas de alto impacto (Science/Nature) y defensa oral.
+================================================================================
+
+[NODO MADRE 6.1] La negociación en la cumbre: decir mucho entre líneas
+  - Subtítulo: Interpreta el subtexto y los matices no dichos en cumbres multilaterales de alto nivel
+  - Escenario Real: "Mesa de negociación multilateral a puerta cerrada en el Palacio de las Naciones, Ginebra."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 6.1-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 6.1-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 6.1-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 6.2] Inglés sin fronteras: descifrar dialectos y acentos globales
+  - Subtítulo: Interactúa fluidamente con investigadores escoceses, australianos, británicos e indios
+  - Escenario Real: "Mesa redonda global en Edimburgo con investigadores de Reino Unido, Australia, Escocia e India."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 6.2-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 6.2-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 6.2-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 6.3] El texto impecable: pulir un artículo al nivel de Science
+  - Subtítulo: Sincroniza la coherencia discursiva, el ritmo sintáctico y el léxico doctoral con estructura IMRAD
+  - Escenario Real: "Revisión final de manuscrito con el editor en jefe antes del envío a Science."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 6.3-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 6.3-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 6.3-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+[NODO MADRE 6.4] La defensa del doctorado: responder con soltura ante el tribunal
+  - Subtítulo: Sostén tu tesis viva voce en Oxford con aplomo ante las interrogaciones socráticas de los examinadores
+  - Escenario Real: "Defensa oral de tesis doctoral en el Gran Salón de Ceremonias de la Universidad de Oxford."
+  - Recompensa Base: +35 XP
+  - Tríada de Inmersión Asociada (Sub-Nodos):
+      * Sub-Nodo 6.4-A [Reading]: Lectura inmersiva graduada (+20 XP, click-to-define)
+      * Sub-Nodo 6.4-B [Listening]: Escucha pasiva en audio nativo (+20 XP, transcript sincronizado)
+      * Sub-Nodo 6.4-C [SRS]: Repaso espaciado de patrones y léxico clave (+15 XP)
+
+
+--------------------------------------------------------------------------------
+4. CATÁLOGO DE PROYECTOS UNIVERSITARIOS CAPSTONE (TBLT)
+--------------------------------------------------------------------------------
+1. NIVEL A1 (U1): Formulario de Admisión Académica y Carta de Presentación Universitaria.
+   Rúbrica: Identidad, origen, edad y motivos de estudio claros.
+
+2. NIVEL A2 (U2): Reporte Técnico de Laboratorio y Biografía de un Pionero de la Ciencia.
+   Rúbrica: Flujo cronológico en pasado simple, conectores temporales y precisión descriptiva.
+
+3. NIVEL B1 (U3): Portafolio Profesional y Plan de Contingencias Tecnológicas.
+   Rúbrica: Uso preciso del Presente Perfecto para logros acumulados y condicionales para riesgos.
+
+4. NIVEL B2 (U4): Ensayo Argumentativo Académico Formal con Citas y Refutación.
+   Rúbrica: Estructura tripartita (tesis, argumentos con evidencia, refutación de contraargumento).
+
+5. NIVEL C1 (U5): Paper de Investigación con Cautela Académica (Hedging) y Tono Diplomático.
+   Rúbrica: Inversión sintáctica, modalizadores de cautela (suggests, indicates) y registro formal.
+
+6. NIVEL C2 (U6): Abstract de Tesis Doctoral de Nivel Science/Nature y Defensa Oral.
+   Rúbrica: Concisión máxima, registro de alta especialización científica y solvencia retórica.
+
+
+--------------------------------------------------------------------------------
+5. COMPONENTES Y RUTAS DEL SISTEMA WEB (ARQUITECTURA TÉCNICA)
+--------------------------------------------------------------------------------
+- / (Ruta Principal): Dashboard con Camino de Aventura Serpenteante, Nodos 3D, Radar Chart,
+  Misión Diaria, selector de niveles MCER (A1-C2) y drawer móvil.
+- Modal ImmersionViewer: Visor a pantalla completa para lectura (con contador de palabras,
+  diccionario dinámico con audio y marcado ⭐), escucha receptiva y mazo SRS.
+- Modal LessonRunner: Sala intensiva de 6 etapas krashenianas a pantalla completa.
+- Vista Immersion: Biblioteca de lectura estrecha (Narrow Reading) con cálculo de tiempo de inmersión.
+- Vista Syllabus: Temario oficial universitario desglosado por competencias.
+- Vista Projects: Taller interactivo de entrega y evaluación automatizada de proyectos TBLT.
+- Vista Review: Motor de repaso espaciado con algoritmo de familiaridad (0-12) y tarjetas estrella.
+
+
+--------------------------------------------------------------------------------
+6. PUNTOS CLAVE PARA DEPURAR Y PRÓXIMAS MEJORAS SUGERIDAS
+--------------------------------------------------------------------------------
+Para optimizar y llevar el curso al siguiente nivel, se sugieren las siguientes áreas de trabajo:
+
+1. INYECCIÓN DE CONTENIDO REAL EN SUB-NODOS:
+   - Actualmente las lecciones 1.1 a 1.4 cuentan con textos y audios preconfigurados.
+   - Las lecciones de A2 a C2 cuentan con generadores de plantilla listos para recibir tus
+     textos de lectura específicos y grabaciones de audio nativas en /content/course-content.ts.
+
+2. MOTOR DE INPUT PERSONALIZADO (ALGORITMO i+1):
+   - El hook base `PersonalizedInputEngine` ya está preparado en el código para medir la
+     familiaridad (0 a 12) por cada palabra del alumno y ensamblar micro-historias con 90% de
+     vocabulario conocido + 10% nuevo.
+
+3. EXPEDICIÓN DE CERTIFICADOS MCER:
+   - Añadir generación de diploma digital descargable al completar cada uno de los 6 proyectos
+     con su correspondiente nivel MCER acreditado.
+
+================================================================================
+FIN DEL DOCUMENTO • FLUENTIA NATURAL LANGUAGE ACQUISITION SYSTEM
+================================================================================
