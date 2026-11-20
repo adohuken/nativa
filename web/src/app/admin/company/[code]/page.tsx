@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -43,7 +43,23 @@ interface CompanyStudent {
   status: 'active' | 'certified' | 'in_progress';
 }
 
+export const dynamic = 'force-dynamic';
+
 export default function CompanyB2BDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#060911] text-white flex items-center justify-center font-mono text-sm">
+          Cargando Portal Corporativo...
+        </div>
+      }
+    >
+      <CompanyDashboardContent />
+    </Suspense>
+  );
+}
+
+function CompanyDashboardContent() {
   const params = useParams();
   const router = useRouter();
   const rawCode = (params?.code as string) || '';
@@ -106,8 +122,8 @@ export default function CompanyB2BDashboardPage() {
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (s.department || '').toLowerCase().includes(searchTerm.toLowerCase());
+        s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.department || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchLevel = levelFilter === 'ALL' || s.currentLevel === levelFilter;
       return matchSearch && matchLevel;
     });
@@ -146,8 +162,8 @@ export default function CompanyB2BDashboardPage() {
 
   // Cálculos agregados reales (sin valores inventados)
   const totalStudentsCount = students.length;
-  const avgLevel = totalStudentsCount > 0 
-    ? students[Math.floor(totalStudentsCount / 2)].currentLevel 
+  const avgLevel = totalStudentsCount > 0
+    ? students[Math.floor(totalStudentsCount / 2)].currentLevel
     : '-';
   const avgScore = totalStudentsCount > 0
     ? Math.round(students.reduce((acc, s) => acc + s.tbltAverageScore, 0) / totalStudentsCount)
@@ -156,7 +172,7 @@ export default function CompanyB2BDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans p-4 sm:p-8 space-y-8">
-      
+
       {/* Barra de Navegación Superior */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div className="flex items-center gap-3">
@@ -290,11 +306,10 @@ export default function CompanyB2BDashboardPage() {
                 setLevelFilter(lvl);
                 soundManager.playClick();
               }}
-              className={`px-3 py-1 rounded-lg text-xs font-bold font-mono transition ${
-                levelFilter === lvl
-                  ? 'bg-purple-900/60 border border-purple-500/40 text-purple-200'
-                  : 'bg-[#060911] border border-slate-800 text-slate-400 hover:text-white'
-              }`}
+              className={`px-3 py-1 rounded-lg text-xs font-bold font-mono transition ${levelFilter === lvl
+                ? 'bg-purple-900/60 border border-purple-500/40 text-purple-200'
+                : 'bg-[#060911] border border-slate-800 text-slate-400 hover:text-white'
+                }`}
             >
               {lvl}
             </button>
@@ -341,13 +356,12 @@ export default function CompanyB2BDashboardPage() {
                       {std.department || 'Colaborador'}
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                        std.currentLevel === 'C2' || std.currentLevel === 'C1'
-                          ? 'bg-purple-950/60 border-purple-500/30 text-purple-300'
-                          : std.currentLevel === 'B2' || std.currentLevel === 'B1'
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${std.currentLevel === 'C2' || std.currentLevel === 'C1'
+                        ? 'bg-purple-950/60 border-purple-500/30 text-purple-300'
+                        : std.currentLevel === 'B2' || std.currentLevel === 'B1'
                           ? 'bg-blue-950/60 border-blue-500/30 text-blue-300'
                           : 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300'
-                      }`}>
+                        }`}>
                         {std.currentLevel}
                       </span>
                     </td>
