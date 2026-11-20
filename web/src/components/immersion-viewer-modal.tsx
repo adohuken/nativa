@@ -137,6 +137,8 @@ export function ImmersionViewerModal({
       en: word,
       es: def,
       context: reading?.title || 'Lectura de Inmersión',
+      lessonId: subNode?.motherNodeId || 'general',
+      level: 'B1'
     });
     soundManager.playClick();
   };

@@ -132,19 +132,19 @@ export function UserProfileModal({
 
     if (newPassword.length < 6) {
       setPasswordError('La nueva contraseña debe tener al menos 6 caracteres.');
-      soundManager.playError?.();
+      soundManager.playClick();
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setPasswordError('Las contraseñas no coinciden.');
-      soundManager.playError?.();
+      soundManager.playClick();
       return;
     }
 
     if (!AppStorage.verifyCurrentPassword(currentPassword)) {
       setPasswordError('La contraseña actual es incorrecta.');
-      soundManager.playError?.();
+      soundManager.playClick();
       return;
     }
 

@@ -56,6 +56,16 @@ import {
   saveLessonInLanguage,
   createGenericCourseForLanguage
 } from '@/lib/multi-language-courses';
+import {
+  getAllSpecializedTracks,
+  getTrackBySlug,
+  getTrackCourseContent,
+  saveTrackCourseContent,
+  saveSpecializedTrack,
+  SpecializedTrack,
+  CourseType,
+  DEFAULT_SPECIALIZED_TRACKS
+} from '@/lib/specialized-tracks';
 
 type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS';
 
@@ -64,15 +74,31 @@ export default function AdminDashboardPage() {
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
 
   // =========================================================================
+  // TIPO DE CURSO: GENERAL (A1-C2) vs ESPECIALIZADO (Call Center, IT, etc.)
+  // =========================================================================
+  const [courseType, setCourseType] = useState<CourseType>('general');
+  const [specializedTracks, setSpecializedTracks] = useState<Record<string, SpecializedTrack>>(DEFAULT_SPECIALIZED_TRACKS);
+  const [selectedTrackSlug, setSelectedTrackSlug] = useState<string>('call-center');
+  const [selectedTrackModuleId, setSelectedTrackModuleId] = useState<string>('mod-cc-1');
+
+  // =========================================================================
   // GESTIÓN DE IDIOMAS (LANGUAGE MANAGER STATE)
   // =========================================================================
   const [languages, setLanguages] = useState<Record<string, LanguageHubEntry>>(LANGUAGES_REGISTRY);
   const [isAddLanguageModalOpen, setIsAddLanguageModalOpen] = useState(false);
+  const [newCourseType, setNewCourseType] = useState<CourseType>('general');
   const [newLangName, setNewLangName] = useState('');
   const [newLangNative, setNewLangNative] = useState('');
   const [newLangCode, setNewLangCode] = useState('');
   const [newLangFlag, setNewLangFlag] = useState('🇵🇹');
   const [newLangTagline, setNewLangTagline] = useState('');
+
+  // Campos para nuevo Curso Especializado
+  const [newTrackName, setNewTrackName] = useState('');
+  const [newTrackIndustry, setNewTrackIndustry] = useState('');
+  const [newTrackSlug, setNewTrackSlug] = useState('');
+  const [newTrackIcon, setNewTrackIcon] = useState<'headset' | 'code' | 'briefcase' | 'phone'>('headset');
+  const [newTrackLevel, setNewTrackLevel] = useState('B1 - B2 Profesional');
 
   // =========================================================================
   // GESTIÓN DE CONTENIDO (CONTENT MANAGER STATE)
@@ -121,54 +147,96 @@ export default function AdminDashboardPage() {
     const allLangs = getAllLanguages();
     setLanguages(allLangs);
 
-    const initialCourse = getCourseContentForLanguage(selectedLanguageId);
-    setActiveCourse(initialCourse);
+    const allTracks = getAllSpecializedTracks();
+    setSpecializedTracks(allTracks);
+
+    if (courseType === 'specialized') {
+      const trackCourse = getTrackCourseContent(selectedTrackSlug);
+      setActiveCourse(trackCourse);
+    } else {
+      const initialCourse = getCourseContentForLanguage(selectedLanguageId);
+      setActiveCourse(initialCourse);
+    }
   }, []);
 
   // =========================================================================
-  // CARGAR CURSO CUANDO CAMBIA EL IDIOMA SELECCIONADO
+  // CAMBIO ENTRE CURSO GENERAL Y CURSO ESPECIALIZADO
   // =========================================================================
   useEffect(() => {
-    const course = getCourseContentForLanguage(selectedLanguageId);
-    setActiveCourse(course);
+    if (courseType === 'specialized') {
+      const trackCourse = getTrackCourseContent(selectedTrackSlug);
+      setActiveCourse(trackCourse);
 
-    // Ajustar lección por defecto según el nivel
-    const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
-    const mod = course.modules[lvlConfig.moduleId];
-    const availableLessonIds = mod && mod.lessons ? Object.keys(mod.lessons) : [];
+      const availableModules = Object.keys(trackCourse.modules || {});
+      const activeModId = availableModules.includes(selectedTrackModuleId) ? selectedTrackModuleId : (availableModules[0] || 'mod-cc-1');
+      setSelectedTrackModuleId(activeModId);
 
-    if (availableLessonIds.length > 0 && !availableLessonIds.includes(selectedLessonId)) {
-      setSelectedLessonId(availableLessonIds[0]);
+      const mod = trackCourse.modules[activeModId];
+      const availableLessonIds = mod && mod.lessons ? Object.keys(mod.lessons) : [];
+      if (availableLessonIds.length > 0) {
+        setSelectedLessonId(availableLessonIds[0]);
+      }
+    } else {
+      const course = getCourseContentForLanguage(selectedLanguageId);
+      setActiveCourse(course);
+
+      const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
+      const mod = course.modules[lvlConfig.moduleId];
+      const availableLessonIds = mod && mod.lessons ? Object.keys(mod.lessons) : [];
+      if (availableLessonIds.length > 0) {
+        setSelectedLessonId(availableLessonIds[0]);
+      }
     }
-  }, [selectedLanguageId]);
+  }, [courseType, selectedTrackSlug, selectedLanguageId]);
 
   // =========================================================================
-  // AJUSTAR LECCIÓN AL CAMBIAR DE NIVEL MCER (A1 a C2)
+  // AJUSTAR LECCIÓN AL CAMBIAR DE NIVEL MCER (General) O MÓDULO (Especializado)
   // =========================================================================
   useEffect(() => {
-    const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
-    const mod = activeCourse.modules[lvlConfig.moduleId];
-    const availableLessonIds = mod && mod.lessons ? Object.keys(mod.lessons) : [];
-
-    const defaultLessonId = availableLessonIds[0] || `${selectedLevel.toLowerCase()}-lesson-1`;
-    setSelectedLessonId(defaultLessonId);
-  }, [selectedLevel]);
+    if (courseType === 'specialized') {
+      const mod = activeCourse.modules[selectedTrackModuleId];
+      const availableLessonIds = mod && mod.lessons ? Object.keys(mod.lessons) : [];
+      if (availableLessonIds.length > 0) {
+        setSelectedLessonId(availableLessonIds[0]);
+      }
+    } else {
+      const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
+      const mod = activeCourse.modules[lvlConfig.moduleId];
+      const availableLessonIds = mod && mod.lessons ? Object.keys(mod.lessons) : [];
+      const defaultLessonId = availableLessonIds[0] || `${selectedLevel.toLowerCase()}-lesson-1`;
+      setSelectedLessonId(defaultLessonId);
+    }
+  }, [selectedLevel, selectedTrackModuleId]);
 
   // =========================================================================
   // POBLAR EL FORMULARIO CUANDO CAMBIA LA LECCIÓN SELECCIONADA
   // =========================================================================
   useEffect(() => {
-    const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
-    const mod = activeCourse.modules[lvlConfig.moduleId];
+    let mod: any = null;
+    if (courseType === 'specialized') {
+      mod = activeCourse.modules[selectedTrackModuleId];
+    } else {
+      const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
+      mod = activeCourse.modules[lvlConfig.moduleId];
+    }
+
     const lesson = mod?.lessons?.[selectedLessonId];
 
     if (lesson) {
       setNodeTitle(lesson.title || '');
-      setNodeSubtitle(`Objetivo comunicativo para ${lesson.title}`);
-      setNodeScenario(`Escenario de inmersión en ${selectedLanguageId.toUpperCase()}`);
+      setNodeSubtitle(
+        courseType === 'specialized'
+          ? `Objetivo operacional para ${lesson.title}`
+          : `Objetivo comunicativo para ${lesson.title}`
+      );
+      setNodeScenario(
+        courseType === 'specialized'
+          ? `Escenario BPO / Atención al Cliente Telefónico`
+          : `Escenario de inmersión en ${selectedLanguageId.toUpperCase()}`
+      );
 
       // SubNodo Reading
-      const rSub = lesson.subNodes?.find(s => s.type === 'reading')?.content?.reading;
+      const rSub = lesson.subNodes?.find((s: any) => s.type === 'reading')?.content?.reading;
       if (rSub) {
         setReadingTitle(rSub.title || '');
         setReadingMinutes(rSub.readingMinutes || 2);
@@ -189,49 +257,45 @@ export default function AdminDashboardPage() {
       }
 
       // SubNodo Listening
-      const lSub = lesson.subNodes?.find(s => s.type === 'listening')?.content?.listening;
+      const lSub = lesson.subNodes?.find((s: any) => s.type === 'listening')?.content?.listening;
       if (lSub) {
         setListeningTitle(lSub.title || '');
         setListeningDuration(lSub.audioDurationText || '1:15 min');
-        setListeningAudioUrl(`https://storage.nativa.io/audio/${selectedLanguageId}/${selectedLessonId}.mp3`);
+        setListeningAudioUrl(`https://storage.nativa.io/audio/${courseType === 'specialized' ? selectedTrackSlug : selectedLanguageId}/${selectedLessonId}.mp3`);
         setListeningScriptEn(lSub.audioScriptEn || '');
         setListeningScriptEs(lSub.audioScriptEs || '');
         setCulturalCapsule(lSub.culturalInsight || '');
       } else {
         setListeningTitle(`Audio Receptivo • ${lesson.lessonCode}`);
         setListeningDuration('1:15 min');
-        setListeningAudioUrl(`https://storage.nativa.io/audio/${selectedLanguageId}/${selectedLessonId}.mp3`);
+        setListeningAudioUrl(`https://storage.nativa.io/audio/${courseType === 'specialized' ? selectedTrackSlug : selectedLanguageId}/${selectedLessonId}.mp3`);
         setListeningScriptEn('');
         setListeningScriptEs('');
         setCulturalCapsule('');
       }
     }
-  }, [selectedLessonId, activeCourse, selectedLevel, selectedLanguageId]);
+  }, [selectedLessonId, activeCourse, selectedLevel, selectedLanguageId, courseType, selectedTrackModuleId, selectedTrackSlug]);
 
-  // Lista de Nodos Madre del Nivel actual
+  // Lista de Nodos Madre del Nivel actual o Módulo Especializado
   const currentLevelLessons = useMemo(() => {
-    const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
-    const mod = activeCourse.modules[lvlConfig.moduleId];
+    let mod: any = null;
+    if (courseType === 'specialized') {
+      mod = activeCourse.modules[selectedTrackModuleId];
+    } else {
+      const lvlConfig = LEVELS_CONFIG[selectedLevel] || LEVELS_CONFIG.A1;
+      mod = activeCourse.modules[lvlConfig.moduleId];
+    }
 
     if (mod && mod.lessons) {
-      return Object.values(mod.lessons).map(l => ({
+      return Object.values<any>(mod.lessons).map((l: any) => ({
         id: l.lessonId,
         code: l.lessonCode,
         title: l.title,
         xp: 35
       }));
     }
-
-    // Fallback de 4 lecciones estándar
-    const prefix = selectedLevel.toLowerCase();
-    const unit = lvlConfig.unitNumber;
-    return [
-      { id: `${prefix}-lesson-1`, code: `${unit}.1`, title: `Nodo ${unit}.1 (${selectedLanguageId.toUpperCase()})`, xp: 35 },
-      { id: `${prefix}-lesson-2`, code: `${unit}.2`, title: `Nodo ${unit}.2 (${selectedLanguageId.toUpperCase()})`, xp: 35 },
-      { id: `${prefix}-lesson-3`, code: `${unit}.3`, title: `Nodo ${unit}.3 (${selectedLanguageId.toUpperCase()})`, xp: 35 },
-      { id: `${prefix}-lesson-4`, code: `${unit}.4`, title: `Nodo ${unit}.4 (${selectedLanguageId.toUpperCase()})`, xp: 35 },
-    ];
-  }, [activeCourse, selectedLevel, selectedLanguageId]);
+    return [];
+  }, [courseType, activeCourse, selectedLevel, selectedTrackModuleId]);
 
   // =========================================================================
   // GUARDAR CAMBIOS DEL FORMULARIO
@@ -254,6 +318,67 @@ export default function AdminDashboardPage() {
 
     const paragraphs = readingText.split('\n\n').filter(p => p.trim().length > 0);
 
+    // Guardado para Curso Especializado
+    if (courseType === 'specialized') {
+      const mod = activeCourse.modules[selectedTrackModuleId];
+      if (mod && mod.lessons && mod.lessons[selectedLessonId]) {
+        const lesson = mod.lessons[selectedLessonId];
+        lesson.title = nodeTitle || lesson.title;
+
+        // SubNodo Reading
+        let readingSub = lesson.subNodes.find((s: any) => s.type === 'reading');
+        if (!readingSub) {
+          readingSub = {
+            id: `${selectedLessonId}-reading`,
+            motherNodeId: selectedLessonId,
+            type: 'reading',
+            title: readingTitle || 'Lectura de Inmersión',
+            label: 'Lectura BPO',
+            durationMinutes: readingMinutes || 3,
+            xpReward: 25,
+            content: { reading: { title: readingTitle, summary: '', wordCount: 100, readingMinutes: readingMinutes || 3, paragraphs: [], vocabulary: {} } }
+          };
+          lesson.subNodes.push(readingSub);
+        }
+        if (readingSub.content?.reading) {
+          readingSub.content.reading.title = readingTitle;
+          readingSub.content.reading.readingMinutes = readingMinutes;
+          readingSub.content.reading.paragraphs = paragraphs.length > 0 ? paragraphs : [readingText];
+          readingSub.content.reading.vocabulary = vocabObject;
+        }
+
+        // SubNodo Listening
+        let listeningSub = lesson.subNodes.find((s: any) => s.type === 'listening');
+        if (!listeningSub) {
+          listeningSub = {
+            id: `${selectedLessonId}-listening`,
+            motherNodeId: selectedLessonId,
+            type: 'listening',
+            title: listeningTitle || 'Audio Receptivo',
+            label: 'Audio Telefónico',
+            durationMinutes: 2,
+            xpReward: 25,
+            content: { listening: { title: listeningTitle, audioDurationText: listeningDuration, audioScriptEn: '', audioScriptEs: '', culturalInsight: '', transcriptLines: [] } }
+          };
+          lesson.subNodes.push(listeningSub);
+        }
+        if (listeningSub.content?.listening) {
+          listeningSub.content.listening.title = listeningTitle;
+          listeningSub.content.listening.audioDurationText = listeningDuration;
+          listeningSub.content.listening.audioScriptEn = listeningScriptEn;
+          listeningSub.content.listening.audioScriptEs = listeningScriptEs;
+          listeningSub.content.listening.culturalInsight = culturalCapsule;
+        }
+
+        saveTrackCourseContent(selectedTrackSlug, activeCourse);
+        const track = specializedTracks[selectedTrackSlug];
+        setSaveSuccessNotice(`✓ Cambios guardados en ${lesson.lessonCode} de ${track?.name || selectedTrackSlug}`);
+        setTimeout(() => setSaveSuccessNotice(null), 3500);
+        return;
+      }
+    }
+
+    // Guardado para Idioma General
     const updatedCourse = saveLessonInLanguage(
       selectedLanguageId,
       selectedLevel,
@@ -284,6 +409,162 @@ export default function AdminDashboardPage() {
     const langName = languages[selectedLanguageId]?.name || selectedLanguageId.toUpperCase();
     setSaveSuccessNotice(`✓ Cambios guardados en ${selectedLessonId.toUpperCase()} (${langName})`);
     setTimeout(() => setSaveSuccessNotice(null), 3500);
+  };
+
+  // =========================================================================
+  // CREAR UN NUEVO TRACK ESPECIALIZADO
+  // =========================================================================
+  const handleCreateSpecializedTrack = () => {
+    if (!newTrackName || !newTrackSlug) return;
+    const slug = newTrackSlug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
+
+    const scaffoldedContent: CourseContent = {
+      modules: {
+        [`mod-${slug}-1`]: {
+          moduleId: `mod-${slug}-1`,
+          unitNumber: 1,
+          level: 'B1',
+          title: 'Módulo 1 • Primer Contacto y Protocolo Inicial',
+          lessons: {
+            [`${slug}-1-1`]: {
+              lessonId: `${slug}-1-1`,
+              lessonCode: '1.1',
+              title: `Apertura Profesional y Saludo en ${newTrackName}`,
+              subNodes: [
+                {
+                  id: `${slug}-1-1-reading`,
+                  motherNodeId: `${slug}-1-1`,
+                  type: 'reading',
+                  title: `Lectura Profesional: Protocolos de ${newTrackName}`,
+                  label: 'Lectura Profesional',
+                  durationMinutes: 3,
+                  xpReward: 25,
+                  content: {
+                    reading: {
+                      title: `Introduction to ${newTrackName} Standards`,
+                      summary: `Directrices esenciales para el ejercicio en ${newTrackIndustry || newTrackName}.`,
+                      wordCount: 110,
+                      readingMinutes: 3,
+                      paragraphs: [
+                        `Welcome to the professional training module for ${newTrackName}. Clear communication, technical vocabulary, and situational awareness are critical.`,
+                        `In this first unit, you will practice real-world workplace dialogues and specialized vocabulary.`
+                      ],
+                      vocabulary: {
+                        'standard': 'Estándar o norma profesional',
+                        'workflow': 'Flujo de trabajo estructurado'
+                      }
+                    }
+                  }
+                },
+                {
+                  id: `${slug}-1-1-listening`,
+                  motherNodeId: `${slug}-1-1`,
+                  type: 'listening',
+                  title: `Audio Receptivo: Caso Real en ${newTrackName}`,
+                  label: 'Audio Especializado',
+                  durationMinutes: 2,
+                  xpReward: 25,
+                  content: {
+                    listening: {
+                      title: `Interaction Dialogue: ${newTrackName}`,
+                      audioDurationText: '1:10 min',
+                      audioScriptEn: `Professional: Good morning, thank you for reaching out. How may I assist you today?\nClient: Hello, I need to verify our current operational status.\nProfessional: Absolutely, let me check the system records right away.`,
+                      audioScriptEs: `Profesional: Buenos días, gracias por contactarnos. ¿Cómo puedo asistirle hoy?\nCliente: Hola, necesito verificar nuestro estado operativo actual.\nProfesional: Por supuesto, permítame revisar los registros de inmediato.`,
+                      culturalInsight: `La comunicación profesional anglosajona enfatiza la cortesía eficiente y la asertividad sin rodeos.`,
+                      transcriptLines: [
+                        { speaker: 'PROFESSIONAL', en: 'Good morning, how may I assist you today?', es: 'Buenos días, ¿cómo puedo asistirle hoy?' },
+                        { speaker: 'CLIENT', en: 'Hello, I need to verify our operational status.', es: 'Hola, necesito verificar nuestro estado operativo.' }
+                      ]
+                    }
+                  }
+                },
+                {
+                  id: `${slug}-1-1-srs`,
+                  motherNodeId: `${slug}-1-1`,
+                  type: 'srs',
+                  title: `Mazo SRS: Frases Clave en ${newTrackName}`,
+                  label: 'Repaso Espaciado',
+                  durationMinutes: 2,
+                  xpReward: 20,
+                  content: {
+                    srs: {
+                      title: `Vocabulario Fundamental para ${newTrackName}`,
+                      cardCount: 2,
+                      targetPhrases: [
+                        { en: 'I will ensure all specifications are properly documented.', es: 'Me aseguraré de que todas las especificaciones queden documentadas adecuadamente.', context: 'Profesionalismo' }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        [`mod-${slug}-2`]: {
+          moduleId: `mod-${slug}-2`,
+          unitNumber: 2,
+          level: 'B1',
+          title: 'Módulo 2 • Procedimientos y Resolución Técnica',
+          lessons: {}
+        },
+        [`mod-${slug}-3`]: {
+          moduleId: `mod-${slug}-3`,
+          unitNumber: 3,
+          level: 'B2',
+          title: 'Módulo 3 • Casos Complejos y Negociación',
+          lessons: {}
+        },
+        [`mod-${slug}-4`]: {
+          moduleId: `mod-${slug}-4`,
+          unitNumber: 4,
+          level: 'B2',
+          title: 'Módulo 4 • Entrega, Calidad y Cierre',
+          lessons: {}
+        }
+      }
+    };
+
+    const newTrack: SpecializedTrack = {
+      id: `${slug}-track`,
+      slug: slug,
+      languageId: 'english',
+      courseType: 'specialized',
+      name: newTrackName.trim(),
+      title: newTrackName.trim(),
+      tagline: newTrackIndustry || `Especialización profesional en ${newTrackName}`,
+      description: `Curso especializado en ${newTrackName} con 4 módulos de inmersión y situaciones reales.`,
+      industry: newTrackIndustry.trim() || 'Sector Profesional',
+      icon: newTrackIcon,
+      level: newTrackLevel,
+      badge: 'Track Especializado',
+      accentColor: 'text-amber-400',
+      gradient: 'from-amber-500 via-orange-400 to-amber-600',
+      modulesCount: 4,
+      lessonsCount: 4,
+      courseContent: scaffoldedContent
+    };
+
+    saveSpecializedTrack(newTrack);
+    saveTrackCourseContent(slug, scaffoldedContent);
+
+    const updatedTracks = getAllSpecializedTracks();
+    setSpecializedTracks(updatedTracks);
+
+    setCourseType('specialized');
+    setSelectedTrackSlug(slug);
+    setSelectedTrackModuleId(`mod-${slug}-1`);
+    setSelectedLessonId(`${slug}-1-1`);
+    setActiveCourse(scaffoldedContent);
+
+    setIsAddLanguageModalOpen(false);
+    soundManager.playVictory();
+    setSaveSuccessNotice(`✓ Track Especializado "${newTrackName}" creado con sus 4 módulos.`);
+    setTimeout(() => setSaveSuccessNotice(null), 3500);
+
+    // Limpiar formulario
+    setNewTrackName('');
+    setNewTrackIndustry('');
+    setNewTrackSlug('');
   };
 
   // =========================================================================
@@ -516,59 +797,138 @@ export default function AdminDashboardPage() {
         {activeTab === 'CONTENT' && (
           <div className="p-6 md:p-8 space-y-6">
 
-            {/* Cabecera con Selectores de Idioma y Nivel */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-[#090d16] border border-slate-800/90 shadow-xl">
-              <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-teal-400 font-bold block">
-                  Content Management System
-                </span>
-                <h1 className="text-xl sm:text-2xl font-black text-white">
-                  Editor de Nodos y Lecciones
-                </h1>
-              </div>
-
-              {/* Selectores */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-slate-400 block font-bold">Idioma:</label>
-                  <select
-                    value={selectedLanguageId}
-                    onChange={(e) => {
-                      setSelectedLanguageId(e.target.value);
-                      soundManager.playClick();
-                    }}
-                    className="bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-teal-500"
-                  >
-                    {Object.values(languages).map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.flag} {l.name}
-                      </option>
-                    ))}
-                  </select>
+            {/* Cabecera con Selector de Tipo de Curso, Idioma / Track y Nivel / Módulo */}
+            <div className="flex flex-col gap-4 p-5 rounded-3xl bg-[#090d16] border border-slate-800/90 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-teal-400 font-bold block">
+                    Content Management System
+                  </span>
+                  <h1 className="text-xl sm:text-2xl font-black text-white">
+                    Editor de Nodos y Lecciones
+                  </h1>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-slate-400 block font-bold">Nivel MCER:</label>
-                  <select
-                    value={selectedLevel}
-                    onChange={(e) => {
-                      setSelectedLevel(e.target.value);
+                {/* SELECTOR DE TIPO DE CURSO: GENERAL vs ESPECIALIZADO */}
+                <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#0b101c] border border-slate-700/80 self-start sm:self-auto shadow-inner">
+                  <button
+                    onClick={() => {
+                      setCourseType('general');
                       soundManager.playClick();
                     }}
-                    className="bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-teal-500"
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                      courseType === 'general'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-md font-black'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
                   >
-                    <option value="A1">A1 • Elemental</option>
-                    <option value="A2">A2 • Básico</option>
-                    <option value="B1">B1 • Intermedio</option>
-                    <option value="B2">B2 • Avanzado</option>
-                    <option value="C1">C1 • Profesional</option>
-                    <option value="C2">C2 • Maestría</option>
-                  </select>
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>Idioma General (A1-C2)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCourseType('specialized');
+                      soundManager.playClick();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                      courseType === 'specialized'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-400 text-slate-950 shadow-md font-black'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Headphones className="w-3.5 h-3.5" />
+                    <span>Curso Especializado</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Selectores dependientes del Tipo de Curso */}
+              <div className="flex items-center justify-between gap-4 flex-wrap pt-3 border-t border-slate-800/80">
+                <div className="flex items-center gap-3 flex-wrap">
+                  {courseType === 'general' ? (
+                    <>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-slate-400 block font-bold">Idioma General:</label>
+                        <select
+                          value={selectedLanguageId}
+                          onChange={(e) => {
+                            setSelectedLanguageId(e.target.value);
+                            soundManager.playClick();
+                          }}
+                          className="bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-teal-500"
+                        >
+                          {Object.values(languages).map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.flag} {l.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-slate-400 block font-bold">Nivel MCER:</label>
+                        <select
+                          value={selectedLevel}
+                          onChange={(e) => {
+                            setSelectedLevel(e.target.value);
+                            soundManager.playClick();
+                          }}
+                          className="bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-teal-500"
+                        >
+                          <option value="A1">A1 • Elemental</option>
+                          <option value="A2">A2 • Básico</option>
+                          <option value="B1">B1 • Intermedio</option>
+                          <option value="B2">B2 • Avanzado</option>
+                          <option value="C1">C1 • Profesional</option>
+                          <option value="C2">C2 • Maestría</option>
+                        </select>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-amber-400 block font-bold">Especialización / Track:</label>
+                        <select
+                          value={selectedTrackSlug}
+                          onChange={(e) => {
+                            setSelectedTrackSlug(e.target.value);
+                            soundManager.playClick();
+                          }}
+                          className="bg-[#0b101c] border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-300 focus:outline-none focus:border-amber-400"
+                        >
+                          {Object.values(specializedTracks).map((t) => (
+                            <option key={t.slug} value={t.slug}>
+                              🎧 {t.name} ({t.industry})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-slate-400 block font-bold">Módulo de Especialización:</label>
+                        <select
+                          value={selectedTrackModuleId}
+                          onChange={(e) => {
+                            setSelectedTrackModuleId(e.target.value);
+                            soundManager.playClick();
+                          }}
+                          className="bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-teal-500"
+                        >
+                          {Object.values(activeCourse.modules || {}).map((m) => (
+                            <option key={m.moduleId} value={m.moduleId}>
+                              {m.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <button
                   onClick={handleSaveContentChanges}
-                  className="self-end px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-emerald-500/20 flex items-center gap-2"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Guardar Cambios</span>
@@ -582,7 +942,9 @@ export default function AdminDashboardPage() {
               {/* Columna Izquierda: Árbol de Nodos Madre (4 columnas) */}
               <div className="lg:col-span-4 space-y-3">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block px-1">
-                  Nodos Madre • Unidad {LEVELS_CONFIG[selectedLevel]?.unitNumber || 1} ({selectedLevel})
+                  {courseType === 'specialized'
+                    ? `Nodos Especializados • ${activeCourse.modules[selectedTrackModuleId]?.title || 'Módulo'}`
+                    : `Nodos Madre • Unidad ${LEVELS_CONFIG[selectedLevel]?.unitNumber || 1} (${selectedLevel})`}
                 </span>
 
                 <div className="space-y-2">
@@ -856,84 +1218,173 @@ export default function AdminDashboardPage() {
         )}
 
         {/* ===================================================================
-            2. PESTAÑA: GESTIÓN DE IDIOMAS (LANGUAGE MANAGER)
+            2. PESTAÑA: GESTIÓN DE IDIOMAS Y CURSOS (LANGUAGE & TRACK MANAGER)
         =================================================================== */}
         {activeTab === 'LANGUAGES' && (
           <div className="p-6 md:p-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-[#090d16] border border-slate-800/90 shadow-xl">
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400 font-bold block">
-                  Language Manager
+                  Language & Track Manager
                 </span>
                 <h1 className="text-xl sm:text-2xl font-black text-white">
-                  Idiomas de la Plataforma
+                  Idiomas y Cursos Especializados
                 </h1>
               </div>
 
-              <button
-                onClick={() => setIsAddLanguageModalOpen(true)}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-cyan-500/20 flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Añadir Nuevo Idioma</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setNewCourseType('general');
+                    setIsAddLanguageModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Añadir Nuevo Idioma</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setNewCourseType('specialized');
+                    setIsAddLanguageModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                >
+                  <Headphones className="w-4 h-4" />
+                  <span>Añadir Especialización</span>
+                </button>
+              </div>
             </div>
 
-            {/* Tabla de Idiomas */}
-            <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-[#090d16]">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#0b101c] border-b border-slate-800 text-slate-400 uppercase font-mono text-[10px]">
-                  <tr>
-                    <th className="p-4">Idioma</th>
-                    <th className="p-4">Código ISO</th>
-                    <th className="p-4">Estado</th>
-                    <th className="p-4">Niveles</th>
-                    <th className="p-4">Nodos Madre</th>
-                    <th className="p-4 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-slate-300">
-                  {Object.values(languages).map((lang) => (
-                    <tr key={lang.id} className="hover:bg-slate-900/50 transition">
-                      <td className="p-4 flex items-center gap-3">
-                        <span className="text-2xl">{lang.flag}</span>
-                        <div>
-                          <strong className="text-white block">{lang.name}</strong>
-                          <span className="text-[11px] text-slate-400">{lang.nativeName}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 font-mono uppercase text-teal-400">{lang.id}</td>
-                      <td className="p-4">
-                        <button
-                          onClick={() => handleToggleLanguageStatus(lang.id)}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border flex items-center gap-1.5 transition ${lang.status === 'active'
-                            ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                            }`}
-                          title="Haz clic para activar/desactivar este idioma"
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${lang.status === 'active' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                          {lang.status === 'active' ? 'Activo' : 'Próximamente'}
-                        </button>
-                      </td>
-                      <td className="p-4 font-mono">{lang.levelsCount || 6} (A1 - C2)</td>
-                      <td className="p-4 font-mono">{lang.lessonsCount || 24}</td>
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedLanguageId(lang.id);
-                            setActiveTab('CONTENT');
-                            soundManager.playClick();
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition font-bold"
-                        >
-                          Editar Contenido
-                        </button>
-                      </td>
+            {/* SECCIÓN 1: CURSOS ESPECIALIZADOS */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Headphones className="w-4 h-4 text-amber-400" />
+                  <span>Tracks de Especialización Profesional ({Object.keys(specializedTracks).length})</span>
+                </h2>
+                <span className="text-[11px] font-mono text-amber-400/90 bg-amber-950/40 border border-amber-500/30 px-2.5 py-0.5 rounded-lg">
+                  BPO & Sectores Industriales
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-[#090d16]">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#0b101c] border-b border-slate-800 text-slate-400 uppercase font-mono text-[10px]">
+                    <tr>
+                      <th className="p-4">Especialización</th>
+                      <th className="p-4">Industria / Enfoque</th>
+                      <th className="p-4">Nivel Objetivo</th>
+                      <th className="p-4">Módulos</th>
+                      <th className="p-4">Nodos</th>
+                      <th className="p-4 text-right">Acción</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                    {Object.values(specializedTracks).map((t) => (
+                      <tr key={t.slug} className="hover:bg-slate-900/50 transition">
+                        <td className="p-4 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 text-slate-950 flex items-center justify-center font-bold text-base shadow-sm">
+                            <Headphones className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <strong className="text-white block">{t.name}</strong>
+                            <span className="text-[11px] font-mono text-amber-400">{t.badge}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-slate-300">{t.industry}</td>
+                        <td className="p-4 font-mono text-orange-300 font-bold">{t.level}</td>
+                        <td className="p-4 font-mono">{t.modulesCount} Fases</td>
+                        <td className="p-4 font-mono">{t.lessonsCount} Nodos</td>
+                        <td className="p-4 text-right">
+                          <button
+                            onClick={() => {
+                              setCourseType('specialized');
+                              setSelectedTrackSlug(t.slug);
+                              setActiveTab('CONTENT');
+                              soundManager.playClick();
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 transition font-bold"
+                          >
+                            Editar Contenido
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* SECCIÓN 2: IDIOMAS GENERALES */}
+            <div className="space-y-3 pt-4">
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  <span>Idiomas Generales ({Object.keys(languages).length})</span>
+                </h2>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Ruta Universitaria MCER A1 → C2
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-[#090d16]">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#0b101c] border-b border-slate-800 text-slate-400 uppercase font-mono text-[10px]">
+                    <tr>
+                      <th className="p-4">Idioma</th>
+                      <th className="p-4">Código ISO</th>
+                      <th className="p-4">Estado</th>
+                      <th className="p-4">Niveles</th>
+                      <th className="p-4">Nodos Madre</th>
+                      <th className="p-4 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                    {Object.values(languages).map((lang) => (
+                      <tr key={lang.id} className="hover:bg-slate-900/50 transition">
+                        <td className="p-4 flex items-center gap-3">
+                          <span className="text-2xl">{lang.flag}</span>
+                          <div>
+                            <strong className="text-white block">{lang.name}</strong>
+                            <span className="text-[11px] text-slate-400">{lang.nativeName}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 font-mono uppercase text-teal-400">{lang.id}</td>
+                        <td className="p-4">
+                          <button
+                            onClick={() => handleToggleLanguageStatus(lang.id)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border flex items-center gap-1.5 transition ${lang.status === 'active'
+                              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            title="Haz clic para activar/desactivar este idioma"
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${lang.status === 'active' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                            {lang.status === 'active' ? 'Activo' : 'Próximamente'}
+                          </button>
+                        </td>
+                        <td className="p-4 font-mono">{lang.levelsCount || 6} (A1 - C2)</td>
+                        <td className="p-4 font-mono">{lang.lessonsCount || 24}</td>
+                        <td className="p-4 text-right">
+                          <button
+                            onClick={() => {
+                              setCourseType('general');
+                              setSelectedLanguageId(lang.id);
+                              setActiveTab('CONTENT');
+                              soundManager.playClick();
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition font-bold"
+                          >
+                            Editar Contenido
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1073,7 +1524,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Tarjetas de Métricas Clave */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="p-5 rounded-3xl bg-[#090d16] border border-slate-800/90 space-y-2">
                 <div className="flex items-center justify-between text-slate-400 text-xs">
                   <span>Usuarios Totales</span>
@@ -1109,6 +1560,17 @@ export default function AdminDashboardPage() {
                 <div className="text-2xl font-black text-white">{Object.keys(languages).length}</div>
                 <span className="text-[10px] font-mono text-purple-400 font-bold block">
                   {Object.values(languages).filter(l => l.status === 'active').length} Activo • {Object.values(languages).filter(l => l.status !== 'active').length} Próximamente
+                </span>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-[#090d16] border border-amber-500/30 space-y-2 bg-gradient-to-br from-amber-950/20 to-transparent">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span className="text-amber-400 font-bold">Tracks BPO</span>
+                  <Headphones className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="text-2xl font-black text-amber-300">{Object.keys(specializedTracks).length}</div>
+                <span className="text-[10px] font-mono text-amber-400 font-bold block">
+                  Call Center Activo
                 </span>
               </div>
             </div>
@@ -1169,19 +1631,28 @@ export default function AdminDashboardPage() {
       </main>
 
       {/* =====================================================================
-          MODAL: AÑADIR NUEVO IDIOMA
+          MODAL: AÑADIR NUEVO IDIOMA O CURSO ESPECIALIZADO
       ===================================================================== */}
       {isAddLanguageModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md bg-[#090d16] border border-slate-700 rounded-3xl p-6 space-y-5 shadow-2xl"
+            className="w-full max-w-lg bg-[#090d16] border border-slate-700 rounded-3xl p-6 space-y-5 shadow-2xl"
           >
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Globe className="w-4 h-4 text-cyan-400" />
-                Añadir Nuevo Idioma
+                {newCourseType === 'specialized' ? (
+                  <>
+                    <Headphones className="w-4 h-4 text-amber-400" />
+                    <span>Añadir Nuevo Curso Especializado</span>
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-4 h-4 text-cyan-400" />
+                    <span>Añadir Nuevo Idioma General</span>
+                  </>
+                )}
               </h3>
               <button
                 onClick={() => setIsAddLanguageModalOpen(false)}
@@ -1191,86 +1662,214 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateLanguage} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[11px] font-mono text-slate-400 font-bold block">Nombre en Español:</label>
-                <input
-                  type="text"
-                  placeholder="ej. Portugués"
-                  value={newLangName}
-                  onChange={(e) => setNewLangName(e.target.value)}
-                  className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500 font-bold"
-                  required
-                />
-              </div>
+            {/* SELECTOR DE TIPO DE CURSO EN EL MODAL */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-mono text-slate-400 font-bold block">
+                Tipo de Curso / Arquitectura Curricular:
+              </label>
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#0b101c] border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setNewCourseType('general')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+                    newCourseType === 'general'
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-black shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  <span>Idioma General (A1-C2)</span>
+                </button>
 
-              <div className="space-y-1">
-                <label className="text-[11px] font-mono text-slate-400 font-bold block">Nombre Nativo:</label>
-                <input
-                  type="text"
-                  placeholder="ej. Português"
-                  value={newLangNative}
-                  onChange={(e) => setNewLangNative(e.target.value)}
-                  className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                />
+                <button
+                  type="button"
+                  onClick={() => setNewCourseType('specialized')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+                    newCourseType === 'specialized'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-400 text-slate-950 font-black shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Headphones className="w-4 h-4" />
+                  <span>Especializado (4 Módulos)</span>
+                </button>
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-3">
+            {/* FORMULARIO: IDIOMA GENERAL */}
+            {newCourseType === 'general' ? (
+              <form onSubmit={handleCreateLanguage} className="space-y-4 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-mono text-slate-400 font-bold block">Código ISO:</label>
+                  <label className="text-[11px] font-mono text-slate-400 font-bold block">Nombre en Español:</label>
                   <input
                     type="text"
-                    placeholder="ej. pt"
-                    value={newLangCode}
-                    onChange={(e) => setNewLangCode(e.target.value)}
-                    className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-teal-300 font-mono font-bold focus:outline-none focus:border-cyan-500"
+                    placeholder="ej. Portugués"
+                    value={newLangName}
+                    onChange={(e) => setNewLangName(e.target.value)}
+                    className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500 font-bold"
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] font-mono text-slate-400 font-bold block">Bandera Emoji:</label>
+                  <label className="text-[11px] font-mono text-slate-400 font-bold block">Nombre Nativo:</label>
                   <input
                     type="text"
-                    placeholder="🇵🇹"
-                    value={newLangFlag}
-                    onChange={(e) => setNewLangFlag(e.target.value)}
-                    className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white text-center text-lg focus:outline-none focus:border-cyan-500"
+                    placeholder="ej. Português"
+                    value={newLangNative}
+                    onChange={(e) => setNewLangNative(e.target.value)}
+                    className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-[11px] font-mono text-slate-400 font-bold block">Lema o Enfoque:</label>
-                <input
-                  type="text"
-                  placeholder="ej. Inmersión en Lisboa y Coímbra"
-                  value={newLangTagline}
-                  onChange={(e) => setNewLangTagline(e.target.value)}
-                  className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                />
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-slate-400 font-bold block">Código ISO:</label>
+                    <input
+                      type="text"
+                      placeholder="ej. pt"
+                      value={newLangCode}
+                      onChange={(e) => setNewLangCode(e.target.value)}
+                      className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-teal-300 font-mono font-bold focus:outline-none focus:border-cyan-500"
+                      required
+                    />
+                  </div>
 
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400">
-                💡 Al crear el idioma se generará automáticamente la estructura de 6 niveles (A1 a C2) con 24 nodos listos para personalizar.
-              </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-slate-400 font-bold block">Bandera Emoji:</label>
+                    <input
+                      type="text"
+                      placeholder="🇵🇹"
+                      value={newLangFlag}
+                      onChange={(e) => setNewLangFlag(e.target.value)}
+                      className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white text-center text-lg focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
 
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddLanguageModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black"
-                >
-                  Crear y Generar Curriculum
-                </button>
-              </div>
-            </form>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono text-slate-400 font-bold block">Lema o Enfoque:</label>
+                  <input
+                    type="text"
+                    placeholder="ej. Inmersión en Lisboa y Coímbra"
+                    value={newLangTagline}
+                    onChange={(e) => setNewLangTagline(e.target.value)}
+                    className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400">
+                  💡 Al crear el idioma se generará automáticamente la estructura vacía de 6 niveles (A1 a C2) con 24 nodos listos para editar.
+                </div>
+
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddLanguageModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black"
+                  >
+                    Crear y Generar Curriculum A1-C2
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* FORMULARIO: CURSO ESPECIALIZADO */
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleCreateSpecializedTrack();
+                }}
+                className="space-y-4 text-xs"
+              >
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono text-amber-400 font-bold block">
+                    Nombre del Curso / Track:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ej. Inglés para IT & Cloud, Inglés para Enfermería"
+                    value={newTrackName}
+                    onChange={(e) => setNewTrackName(e.target.value)}
+                    className="w-full bg-[#0b101c] border border-amber-500/40 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-bold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono text-slate-400 font-bold block">
+                    Industria o Sector Profesional:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ej. Tecnología & Helpdesk, Salud Hospitalaria, Ventas B2B"
+                    value={newTrackIndustry}
+                    onChange={(e) => setNewTrackIndustry(e.target.value)}
+                    className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-slate-400 font-bold block">
+                      Código Identificador (Slug):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ej. it, nursing, sales"
+                      value={newTrackSlug}
+                      onChange={(e) => setNewTrackSlug(e.target.value)}
+                      className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-slate-400 font-bold block">
+                      Nivel Objetivo:
+                    </label>
+                    <select
+                      value={newTrackLevel}
+                      onChange={(e) => setNewTrackLevel(e.target.value)}
+                      className="w-full bg-[#0b101c] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400"
+                    >
+                      <option value="B1 - B2 Profesional">B1 - B2 Profesional</option>
+                      <option value="B2 - C1 Avanzado">B2 - C1 Avanzado</option>
+                      <option value="A2 - B1 Básico/Intermedio">A2 - B1 Básico/Intermedio</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/20 text-[11px] text-amber-300 space-y-1">
+                  <div className="font-bold">⚡ Generación Automática de 4 Fases:</div>
+                  <div className="text-slate-300 text-[10px]">
+                    1. Primer Contacto • 2. Procedimientos y Resolución • 3. Casos Complejos y Negociación • 4. Entrega y Cierre.
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddLanguageModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 hover:opacity-95 text-slate-950 font-black shadow-lg shadow-amber-500/20"
+                  >
+                    Crear Track y Generar 4 Fases
+                  </button>
+                </div>
+              </form>
+            )}
           </motion.div>
         </div>
       )}

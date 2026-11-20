@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Lock, 
@@ -236,6 +236,18 @@ const LEVEL_THEMES: Record<string, LevelTheme> = {
 };
 
 export default function FluentiaPathPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#070b14] flex items-center justify-center text-emerald-400 font-mono text-xs">
+        Cargando ruta de aprendizaje...
+      </div>
+    }>
+      <FluentiaPathContent />
+    </Suspense>
+  );
+}
+
+function FluentiaPathContent() {
   const params = useParams();
   const languageId = (params?.language as string) || 'english';
   const currentLanguageEntry = getLanguageEntry(languageId);
