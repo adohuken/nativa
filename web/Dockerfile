@@ -39,8 +39,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 RUN mkdir -p web/.next && \
-    cp -rn public web/ 2>/dev/null || true && \
-    cp -rn .next/static web/.next/ 2>/dev/null || true && \
+    cp -r public web/ && \
+    cp -r .next/static web/.next/ && \
     chown -R nextjs:nodejs /app
 
 USER nextjs
