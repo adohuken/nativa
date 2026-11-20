@@ -45,7 +45,13 @@ export function ImmersionViewerModal({
   onAddMinutes,
 }: ImmersionViewerModalProps) {
   // Estados para Reading Principal
-  const [selectedWord, setSelectedWord] = useState<{ word: string; definition: string; phonetic?: string } | null>(null);
+  const [selectedWord, setSelectedWord] = useState<{ 
+    word: string; 
+    definition: string; 
+    phonetic?: string;
+    isTechnical?: boolean;
+    isStarred?: boolean;
+  } | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [isPlayingFullAudio, setIsPlayingFullAudio] = useState(false);
   const [audioSpeed, setAudioSpeed] = useState<number>(1.0);
@@ -103,19 +109,41 @@ export function ImmersionViewerModal({
 
   const handleWordClick = (rawWord: string, e: React.MouseEvent, vocabDictionary?: Record<string, string>) => {
     e.stopPropagation();
-    const cleanWord = rawWord.replace(/[^a-zA-Z']/g, '').toLowerCase();
+    const cleanWord = rawWord.replace(/[^a-zA-Z0-9']/g, '').toLowerCase();
     if (!cleanWord || cleanWord.length < 2) return;
 
     const dict = vocabDictionary || reading?.vocabulary || {};
-    let def = dict[cleanWord];
+    
+    // 1. Buscar coincidencia exacta
+    let matchedKey = Object.keys(dict).find(k => k.toLowerCase() === cleanWord);
 
-    // Fallback: variantes simples
-    if (!def && cleanWord.endsWith('s')) def = dict[cleanWord.slice(0, -1)];
-    if (!def && cleanWord.endsWith('ed')) def = dict[cleanWord.slice(0, -2)];
+    // 2. Si no coincide directamente, buscar si es parte de un término compuesto BPO (ej: "two-factor authentication", "zip code", "open-ended question")
+    if (!matchedKey) {
+      matchedKey = Object.keys(dict).find(k => {
+        const cleanKey = k.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, ' ');
+        const parts = cleanKey.split(/\s+/).filter(Boolean);
+        return parts.includes(cleanWord);
+      });
+    }
 
+    // 3. Fallbacks morfológicos (plurales o participios pasados)
+    let def = matchedKey ? dict[matchedKey] : undefined;
+    if (!def && cleanWord.endsWith('s')) {
+      const singular = cleanWord.slice(0, -1);
+      matchedKey = Object.keys(dict).find(k => k.toLowerCase() === singular);
+      if (matchedKey) def = dict[matchedKey];
+    }
+    if (!def && cleanWord.endsWith('ed')) {
+      const base = cleanWord.slice(0, -2);
+      matchedKey = Object.keys(dict).find(k => k.toLowerCase() === base);
+      if (matchedKey) def = dict[matchedKey];
+    }
+
+    const displayWord = matchedKey || cleanWord;
+    const isTechnical = !!matchedKey;
     const definition = def || `Palabra contextual en inglés: "${cleanWord}". Exposición de input comprensible.`;
 
-    // Posición del tooltip
+    // Posición del tooltip interactivo
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     setTooltipPos({
       x: rect.left + rect.width / 2,
@@ -123,12 +151,14 @@ export function ImmersionViewerModal({
     });
 
     setSelectedWord({
-      word: cleanWord,
+      word: displayWord,
       definition,
+      isTechnical,
+      isStarred: false
     });
 
-    // Pronunciar la palabra al hacer clic
-    speakText(cleanWord, undefined, 0.9);
+    // Pronunciar el término al hacer clic
+    speakText(displayWord, undefined, 0.9);
   };
 
   const handleToggleStarWord = (word: string, def: string) => {
@@ -136,11 +166,12 @@ export function ImmersionViewerModal({
       id: `word-${word}`,
       en: word,
       es: def,
-      context: reading?.title || 'Lectura de Inmersión',
+      context: reading?.title || 'Glosario BPO SRS',
       lessonId: subNode?.motherNodeId || 'general',
       level: 'B1'
     });
-    soundManager.playClick();
+    setSelectedWord(prev => prev ? { ...prev, isStarred: !prev.isStarred } : null);
+    soundManager.playSuccess();
   };
 
   const handleFinishSubNode = () => {
@@ -316,22 +347,26 @@ export function ImmersionViewerModal({
                   <span>Toca o haz clic en cualquier palabra para ver su significado inmediato y escuchar su pronunciación.</span>
                 </div>
 
-                {/* Texto de la Historia Principal */}
-                <div className="space-y-4 font-sans leading-relaxed text-base md:text-lg text-slate-200 selection:bg-emerald-500/30 selection:text-emerald-300">
+                {/* Texto de la Historia Principal con Glosario Interactivo SRS */}
+                <div className="space-y-4 font-sans leading-relaxed text-base md:text-lg text-slate-200 selection:bg-amber-500/30 selection:text-amber-200">
                   {reading.paragraphs.map((paragraph, pIdx) => {
                     const words = paragraph.split(' ');
                     return (
                       <p key={pIdx} className="p-3.5 rounded-2xl bg-[#090d16]/70 border border-slate-800/40 hover:border-slate-700/60 transition">
                         {words.map((w, wIdx) => {
-                          const clean = w.replace(/[^a-zA-Z']/g, '').toLowerCase();
-                          const isVocab = reading.vocabulary && reading.vocabulary[clean];
+                          const clean = w.replace(/[^a-zA-Z0-9']/g, '').toLowerCase();
+                          const isVocab = reading.vocabulary && Object.keys(reading.vocabulary).some(k => {
+                            const cleanK = k.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, ' ');
+                            const parts = cleanK.split(/\s+/).filter(Boolean);
+                            return k.toLowerCase() === clean || parts.includes(clean);
+                          });
                           return (
                             <span
                               key={wIdx}
                               onClick={(e) => handleWordClick(w, e)}
                               className={`cursor-pointer transition duration-150 inline-block px-0.5 rounded ${
                                 isVocab 
-                                  ? 'text-teal-300 font-semibold underline decoration-teal-500/40 decoration-2 underline-offset-4 hover:bg-teal-950/60 hover:text-white' 
+                                  ? 'text-amber-300 font-semibold underline decoration-amber-500/50 decoration-2 underline-offset-4 hover:bg-amber-950/60 hover:text-white' 
                                   : 'hover:text-emerald-300 hover:bg-slate-800/70'
                               }`}
                             >
@@ -344,19 +379,28 @@ export function ImmersionViewerModal({
                   })}
                 </div>
 
-                {/* Glosario Rápido al Pie */}
-                <div className="p-4 rounded-2xl bg-[#080c14] border border-slate-800/80 space-y-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
-                    Vocabulario Adquirido en Contexto:
-                  </span>
+                {/* Glosario Interactivo SRS al Pie */}
+                <div className="p-4 rounded-2xl bg-[#080c14] border border-slate-800/80 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-bold flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      Glosario Interactivo SRS • Vocabulario BPO y Expresiones Clave:
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {Object.keys(reading.vocabulary || {}).length} Términos
+                    </span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(reading.vocabulary).map(([word, meaning], idx) => (
                       <button
                         key={idx}
                         onClick={(e) => handleWordClick(word, e)}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-[#0e1626] border border-slate-800 text-slate-300 hover:border-teal-500/50 hover:text-teal-300 transition"
+                        className="text-xs px-2.5 py-1.5 rounded-xl bg-[#0e1626] border border-amber-500/30 text-amber-200 hover:border-amber-400 hover:bg-amber-950/40 transition flex items-center gap-1.5 group shadow-sm"
+                        title="Clic para pronunciar y guardar en SRS"
                       >
-                        <strong className="capitalize">{word}:</strong> <span className="text-slate-400 text-[11px]">{meaning}</span>
+                        <strong className="capitalize group-hover:text-amber-300">{word}:</strong>
+                        <span className="text-slate-300 text-[11px]">{meaning}</span>
+                        <Star className="w-3 h-3 text-amber-400/60 group-hover:text-amber-400 group-hover:fill-amber-400 shrink-0 ml-0.5" />
                       </button>
                     ))}
                   </div>
@@ -587,18 +631,18 @@ export function ImmersionViewerModal({
               </div>
             )}
 
-            {/* Tooltip Emergente al hacer clic en una palabra */}
+            {/* Tooltip Emergente al hacer clic en una palabra (Glosario Interactivo SRS) */}
             {selectedWord && tooltipPos && (
               <motion.div
                 initial={{ opacity: 0, y: 6, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 style={{
                   position: 'fixed',
-                  left: Math.max(16, Math.min(window.innerWidth - 280, tooltipPos.x - 140)),
-                  top: Math.max(80, tooltipPos.y - 120),
+                  left: Math.max(16, Math.min(window.innerWidth - 300, tooltipPos.x - 140)),
+                  top: Math.max(80, tooltipPos.y - 130),
                   zIndex: 60,
                 }}
-                className="w-72 p-3.5 rounded-2xl bg-[#0d1424] border-2 border-teal-500/50 shadow-2xl space-y-2 text-left"
+                className="w-80 p-3.5 rounded-2xl bg-[#0d1424] border-2 border-amber-500/60 shadow-2xl space-y-2 text-left"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
@@ -606,7 +650,7 @@ export function ImmersionViewerModal({
                     <strong className="text-white text-sm capitalize">{selectedWord.word}</strong>
                     <button
                       onClick={() => speakText(selectedWord.word, undefined, 0.9)}
-                      className="p-1 rounded-md bg-teal-950 text-teal-400 hover:text-white"
+                      className="p-1 rounded-md bg-amber-950/60 border border-amber-500/40 text-amber-300 hover:text-white"
                       title="Escuchar pronunciación"
                     >
                       <Volume2 className="w-3.5 h-3.5" />
@@ -614,14 +658,26 @@ export function ImmersionViewerModal({
                   </div>
                   <button
                     onClick={() => handleToggleStarWord(selectedWord.word, selectedWord.definition)}
-                    className="p-1 rounded-md text-amber-400 hover:bg-amber-950/50"
-                    title="Añadir palabra a mis Frases Estrella (⭐)"
+                    className={`flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-lg border transition ${
+                      selectedWord.isStarred
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                        : 'bg-amber-950/40 text-amber-300 border-amber-500/30 hover:bg-amber-900/60'
+                    }`}
+                    title="Añadir a Repaso Espaciado (SRS)"
                   >
-                    <Star className="w-3.5 h-3.5" />
+                    <Star className={`w-3.5 h-3.5 ${selectedWord.isStarred ? 'fill-current' : ''}`} />
+                    <span>{selectedWord.isStarred ? 'En SRS' : '+ SRS'}</span>
                   </button>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-snug">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/60 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                    {selectedWord.isTechnical ? 'Término BPO' : 'Input SLA'}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Click-to-define SRS</span>
+                </div>
+
+                <p className="text-xs text-slate-200 leading-snug">
                   {selectedWord.definition}
                 </p>
               </motion.div>

@@ -1,0 +1,479 @@
+================================================================================
+NATIVA • CURRICULUM COMPLETO DEL TRACK ESPECIALIZADO
+CURSO: CALL CENTER ENGLISH & CUSTOMER SERVICE PRO
+================================================================================
+ENFOQUE: Adquisición Natural de Lenguas (SLA - Stephen Krashen) + BPO Operations
+NIVEL OBJETIVO: MCER B1 - B2 Intermedio Profesional
+MÉTRICAS CLAVE ABORDADAS: AHT (Average Handling Time), FCR (First Contact Resolution), CSAT (Customer Satisfaction Score)
+ESTRUCTURA: 4 Módulos Operacionales • 8 Nodos Madre • 24 Sub-Nodos de Inmersión (Reading, Listening y SRS)
+ARCHIVO DE ORIGEN: web/src/lib/specialized-tracks.ts
+RUTA EN PLATAFORMA: /learn/english/call-center
+================================================================================
+
+
+--------------------------------------------------------------------------------
+ÍNDICE DE CONTENIDOS
+--------------------------------------------------------------------------------
+MÓDULO 1: PRIMER CONTACTO (FIRST CONTACT & ACTIVE LISTENING)
+  • Nodo 1.1: Apertura de Llamada: Saludo Profesional y Verificación de Cuenta
+  • Nodo 1.2: Escucha Activa: Empatía y Parafraseo del Problema
+
+MÓDULO 2: RESOLUCIÓN (TROUBLESHOOTING & ACTION PLAN)
+  • Nodo 2.1: Diagnóstico Técnico y Preguntas de Sondeo
+  • Nodo 2.2: Procedimiento de Espera (Hold) y Entrega de Solución
+
+MÓDULO 3: CLIENTE DIFÍCIL (DE-ESCALATION & IRATE CUSTOMERS)
+  • Nodo 3.1: Desescalada Verbal y Asertividad sin Confrontación (HEAT Framework)
+  • Nodo 3.2: Límites Profesionales, Políticas y Escalación al Supervisor (Warm Transfer)
+
+MÓDULO 4: SOPORTE & CIERRE (WRAP-UP, CSAT & CLOSING)
+  • Nodo 4.1: Confirmación de Solución y Calidad CSAT
+  • Nodo 4.2: Cierre Profesional de Llamada y Documentación de Ticket (ACW & CRM Notes)
+
+--------------------------------------------------------------------------------
+
+
+================================================================================
+MÓDULO 1 • PRIMER CONTACTO (FIRST CONTACT & ACTIVE LISTENING)
+================================================================================
+Objetivo: Dominar los primeros 30 segundos de una llamada entrante, proyectar calidez
+y seguridad, validar la identidad del cliente sin generar fricción y desarmar la ansiedad
+inicial mediante empatía activa.
+================================================================================
+
+--------------------------------------------------------------------------------
+NODO 1.1: Apertura de Llamada: Saludo Profesional y Verificación de Cuenta
+Código: 1.1 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: Standard Call Opening & Customer Identification Flow
+• Resumen: Protocolo de los primeros 15 segundos en soporte telefónico para clientes en Estados Unidos.
+• Texto Completo:
+  "In top-tier BPO customer service environments, the first 15 seconds establish the tone for the entire interaction. Every inbound call begins with a clear, positive opening statement that introduces your name, the company branding, and an immediate willingness to assist.
+
+  The standard opening sequence follows three key steps: a professional greeting, identifying yourself, and asking an open-ended question such as 'How may I brighten your day today?' or 'How may I assist you with your account?'
+
+  Once the customer states their concern, verification must take place smoothly. Agents verify the account holder through two-factor authentication, security PIN, or billing zip code without sounding robotic or bureaucratic. Tone of voice and cadence are critical."
+
+• Glosario Interactivo SRS:
+  - inbound: Llamada entrante al centro de soporte
+  - greeting: Saludo de bienvenida formal
+  - cadence: Ritmo y entonación vocal al hablar
+  - open-ended question: Pregunta abierta que invita a detallar el problema
+  - two-factor authentication: Autenticación en dos pasos para validar identidad
+  - zip code: Código postal de facturación del cliente
+  - account holder: Titular oficial de la cuenta
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Simulación de Llamada: Apertura y Verificación de Cuenta
+• Duración de Audio: 1:15 min
+• Guión en Inglés:
+  Agent (Alex): Thank you for calling Apex Cloud Support. My name is Alex. May I have your full name and account number please?
+  Customer (Mark): Hi Alex, this is Mark Sullivan. My account number is 884-902.
+  Agent (Alex): Thank you so much, Mr. Sullivan. For security purposes, could you please confirm the billing zip code on file?
+  Customer (Mark): Sure, it's 94107, San Francisco.
+  Agent (Alex): Perfect, thank you for confirming that! I have your dashboard right in front of me. How can I assist you today, Mr. Sullivan?
+
+• Traducción en Español:
+  Agente (Alex): Gracias por llamar a Soporte Apex Cloud. Mi nombre es Alex. ¿Podría darme su nombre completo y número de cuenta por favor?
+  Cliente (Mark): Hola Alex, soy Mark Sullivan. Mi número de cuenta es 884-902.
+  Agente (Alex): Muchísimas gracias, Sr. Sullivan. Por motivos de seguridad, ¿podría confirmarme el código postal de facturación registrado?
+  Cliente (Mark): Seguro, es 94107, San Francisco.
+  Agente (Alex): Perfecto, ¡gracias por confirmarlo! Tengo su panel de control frente a mí. ¿En qué le puedo asistir hoy, Sr. Sullivan?
+
+• Cápsula Cultural / Pragmática BPO:
+  "En atención al cliente en EE.UU., dirigirse al cliente por su apellido ('Mr. Sullivan') hasta que él indique usar su nombre de pila transmite respeto profesional inmediato."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "Thank you for calling customer support, my name is Alex."
+     -> Gracias por llamar a atención al cliente, mi nombre es Alex. (Contexto: Saludo inicial obligatorio)
+  2. "May I have the pleasure of knowing who I am speaking with?"
+     -> ¿Podría tener el gusto de saber con quién tengo el placer de hablar? (Contexto: Identificación cortés)
+  3. "For security purposes, could you please confirm the billing zip code on file?"
+     -> Por motivos de seguridad, ¿podría confirmar el código postal registrado? (Contexto: Validación de seguridad)
+  4. "I have your account pulled up right now. How can I help you today?"
+     -> Tengo su cuenta abierta justo ahora. ¿Cómo puedo ayudarle hoy? (Contexto: Transición al problema)
+
+
+--------------------------------------------------------------------------------
+NODO 1.2: Escucha Activa: Empatía y Parafraseo del Problema
+Código: 1.2 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: Empathy Statements & Effective Paraphrasing
+• Resumen: Cómo demostrar comprensión sin interrumpir al cliente y validar su frustración.
+• Texto Completo:
+  "Active listening is the cornerstone of exceptional customer service. When a customer explains their issue, avoid cutting them off or giving pre-packaged responses. Instead, use verbal nods like 'I understand', 'I see', and 'Certainly'.
+
+  Paraphrasing means restating the core issue in your own words. For example: 'If I understood correctly, you were charged twice for your monthly subscription, and you need a refund for the duplicate charge. Is that accurate?'
+
+  Empathy statements such as 'I completely understand how frustrating unexpected charges can be' immediately lower customer tension and establish trust."
+
+• Glosario Interactivo SRS:
+  - paraphrasing: Parafrasear (repetir el problema con tus palabras para confirmar)
+  - empathy statement: Declaración de empatía para conectar emocionalmente
+  - verbal nods: Asentimientos verbales breves mientras el cliente habla
+  - duplicate charge: Cargo duplicado en la tarjeta de crédito
+  - cut off: Interrumpir a alguien mientras habla
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Diálogo: Manejo de un Cobro Inesperado
+• Duración de Audio: 1:20 min
+• Guión en Inglés:
+  Customer (Laura): Look, I just checked my bank statement and I see two charges of $89 from your company! I only authorized one!
+  Agent (Carlos): I completely understand your concern, Ms. Davis. An unexpected duplicate charge is definitely frustrating, and I apologize for the inconvenience.
+  Customer (Laura): Thank you. I just need my money back today.
+  Agent (Carlos): Absolutely. Just to ensure we are on the exact same page: you authorized the primary charge on November 10th, but a second pending transaction appeared this morning, correct?
+  Customer (Laura): Yes, exactly. Thank you for listening.
+
+• Traducción en Español:
+  Cliente (Laura): ¡Mire, acabo de revisar el extracto bancario y veo dos cobros de $89 de su empresa! ¡Yo solo autoricé uno!
+  Agente (Carlos): Comprendo totalmente su preocupación, Sra. Davis. Un cobro duplicado inesperado es definitivamente frustrante, y me disculpo por el inconveniente.
+  Cliente (Laura): Gracias. Solo necesito que me devuelvan el dinero hoy.
+  Agente (Carlos): Por supuesto. Solo para asegurarme de que estamos en la misma sintonía: usted autorizó el cobro principal el 10 de noviembre, pero apareció una segunda transacción pendiente esta mañana, ¿correcto?
+  Cliente (Laura): Sí, exactamente. Gracias por escucharme.
+
+• Cápsula Cultural / Pragmática BPO:
+  "Validar la emoción del cliente antes de saltar a la parte técnica evita que el cliente se ponga a la defensiva."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "I completely understand how frustrating this situation must be for you."
+     -> Comprendo completamente lo frustrante que debe ser esta situación para usted. (Contexto: Empatía genuina)
+  2. "Just to make sure we are on the exact same page, let me recap what happened."
+     -> Para asegurarme de que estamos en la misma sintonía, permítame recapitular lo sucedido. (Contexto: Parafraseo)
+  3. "You have definitely reached the right person to take care of this today."
+     -> Definitivamente ha llegado con la persona correcta para encargarse de esto hoy. (Contexto: Tranquilizar al cliente)
+
+
+
+================================================================================
+MÓDULO 2 • RESOLUCIÓN (TROUBLESHOOTING & ACTION PLAN)
+================================================================================
+Objetivo: Diagnosticar la causa raíz mediante preguntas de sondeo sin saturar al cliente,
+ejecutar procedimientos correctos de espera (Hold) sin violar estándares de calidad,
+y entregar la solución de forma clara y estructurada.
+================================================================================
+
+--------------------------------------------------------------------------------
+NODO 2.1: Diagnóstico Técnico y Preguntas de Sondeo
+Código: 2.1 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: Probing Questions & Root Cause Analysis
+• Resumen: Cómo hacer preguntas específicas sin abrumar al cliente no técnico.
+• Texto Completo:
+  "When diagnosing a technical or account issue, asking the right questions saves minutes on the average handling time (AHT). Probing questions narrow down the root cause quickly.
+
+  Begin with broad diagnostic inquiries like 'When did you first notice this error message?' before moving to specific checks like 'Have you attempted clearing your browser cache or restarting the application?'
+
+  Always guide the customer through step-by-step instructions using clear transitional signposts: 'First, let us click on Settings... Next, look for the Network tab... Finally, please tell me what status appears.'"
+
+• Glosario Interactivo SRS:
+  - average handling time (AHT): Tiempo promedio de gestión de una llamada
+  - root cause: Causa raíz o motivo principal del fallo
+  - probing questions: Preguntas de sondeo para aislar el problema
+  - troubleshoot: Diagnosticar y resolver un fallo técnico
+  - signposts: Palabras de transición (First, Next, Then, Finally)
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Soporte Técnico: Restablecer Conexión de Software
+• Duración de Audio: 1:18 min
+• Guión en Inglés:
+  Agent (Sam): Let's run a quick diagnostic together. Could you tell me what light is showing on your main modem?
+  Customer (Elena): The power light is solid green, but the internet symbol is blinking orange.
+  Agent (Sam): Excellent observation, that tells us the device is receiving power but lost connection with the local gateway. Let's unplug the power cord for fifteen seconds to power-cycle it.
+  Customer (Elena): Alright, I just unplugged it. Counting to fifteen...
+  Agent (Sam): Perfect. Please plug it back in and let's watch the lights calibrate.
+
+• Traducción en Español:
+  Agente (Sam): Hagamos un diagnóstico rápido juntos. ¿Podría decirme qué luz se muestra en su módem principal?
+  Cliente (Elena): La luz de encendido está verde fija, pero el símbolo de internet parpadea en naranja.
+  Agente (Sam): Excelente observación, eso nos indica que el equipo recibe energía pero perdió conexión con la puerta de enlace. Desconectemos el cable durante quince segundos para reiniciar el ciclo eléctrico.
+  Cliente (Elena): Muy bien, acabo de desconectarlo. Contando hasta quince...
+  Agente (Sam): Perfecto. Por favor conéctelo de nuevo y observemos cómo se calibran las luces.
+
+• Cápsula Cultural / Pragmática BPO:
+  "Agradecer y felicitar al cliente ('Excellent observation') eleva su confianza y reduce la tensión tecnológica."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "Could you please describe what happens on your screen when you click Submit?"
+     -> ¿Podría describir qué ocurre en su pantalla al hacer clic en Enviar? (Contexto: Sondeo de error)
+  2. "Let us perform a quick power-cycle to refresh your connection."
+     -> Hagamos un reinicio rápido de energía para refrescar su conexión. (Contexto: Instrucción técnica)
+  3. "When did you first notice this issue occurring?"
+     -> ¿Cuándo notó por primera vez que ocurría este problema? (Contexto: Línea de tiempo del fallo)
+
+
+--------------------------------------------------------------------------------
+NODO 2.2: Procedimiento de Espera (Hold) y Entrega de Solución
+Código: 2.2 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: Placing Callers on Hold & Returning Gracefully
+• Resumen: Las reglas de oro de BPO para poner a un cliente en espera sin generar quejas.
+• Texto Completo:
+  "Never put a customer on hold without asking for permission first and giving a concrete timeframe. The golden rule is: Reason + Estimated Time + Permission Request.
+
+  For instance: 'Mr. Sullivan, I need to consult with our billing specialist to process your refund. May I place you on a brief hold for about two minutes while I review this?'
+
+  Always return with a thank you: 'Thank you for your patience while on hold, Mr. Sullivan. I have wonderful news for you...'"
+
+• Glosario Interactivo SRS:
+  - place on hold: Poner en espera la llamada
+  - timeframe: Marco de tiempo estimado (ej. 2 minutos)
+  - billing specialist: Especialista del departamento de facturación
+  - thank you for your patience: Gracias por su paciencia (frase obligatoria al volver)
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Simulación: Hold y Aprobación de Reembolso
+• Duración de Audio: 1:15 min
+• Guión en Inglés:
+  Agent (Maria): In order to reverse the duplicate transaction, I need to access our supervisor portal. May I place you on hold for two to three minutes while I finalize this approval?
+  Customer (James): Sure, go ahead Maria.
+  Agent (Maria): Thank you so much, I will be right back with you.
+  [2 minutes later]
+  Agent (Maria): Thank you for holding, Mr. James! I appreciate your patience. I am pleased to inform you that the $89 charge has been reversed successfully.
+
+• Traducción en Español:
+  Agente (Maria): Para revertir la transacción duplicada, necesito acceder a nuestro portal de supervisores. ¿Podría ponerlo en espera por dos o tres minutos mientras finalizo esta aprobación?
+  Cliente (James): Seguro, adelante María.
+  Agente (Maria): Muchísimas gracias, vuelvo con usted enseguida.
+  [2 minutos después]
+  Agente (Maria): ¡Gracias por esperar, Sr. James! Aprecio su paciencia. Me complace informarle que el cobro de $89 ha sido revertido exitosamente.
+
+• Cápsula Cultural / Pragmática BPO:
+  "Si la espera va a tomar más de 2 minutos, el protocolo BPO exige volver a la línea para actualizar al cliente: 'I am still working on this for you'."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "May I place you on a brief hold for two minutes while I consult our tier 2 support?"
+     -> ¿Puedo ponerlo en una breve espera por dos minutos mientras consulto con soporte nivel 2? (Contexto: Pedir espera)
+  2. "Thank you so much for your patience while on hold."
+     -> Muchas gracias por su paciencia mientras estuvo en espera. (Contexto: Retorno cortés)
+  3. "I am pleased to inform you that your request has been fully resolved."
+     -> Me complace informarle que su solicitud ha sido completamente resuelta. (Contexto: Entrega de solución)
+
+
+
+================================================================================
+MÓDULO 3 • CLIENTE DIFÍCIL (DE-ESCALATION & IRATE CUSTOMERS)
+================================================================================
+Objetivo: Gestionar llamadas con alto nivel de agresión o furia, aplicar la técnica
+psicológica de modulación vocal, asumir la propiedad personal del caso y realizar
+transferencias cálidas al supervisor sin abandonar al cliente.
+================================================================================
+
+--------------------------------------------------------------------------------
+NODO 3.1: Desescalada Verbal y Asertividad sin Confrontación
+Código: 3.1 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: De-escalation Strategies for Highly Frustrated Callers
+• Resumen: Cómo desarmar la agresión verbal utilizando tono sereno, vocabulario profesional y la técnica HEAT.
+• Texto Completo:
+  "In customer support, agents encounter callers who shout, demand compensation, or use aggressive language. Winning the argument is losing the customer. Professional de-escalation relies on the HEAT framework: Hear, Empathize, Apologize, Take Action.
+
+  When a caller is screaming, lower your own vocal pitch and speak at half your usual speed. This psychological technique, known as pacing and leading, subconsciously compels the caller to match your calm state.
+
+  Replace defensive phrases like 'That is our policy' with customer-centric alternatives: 'I want to do everything within my power to resolve this for you today.'"
+
+• Glosario Interactivo SRS:
+  - de-escalation: Desescalada (reducir la tensión de un cliente molesto)
+  - irate caller: Llamante enfurecido o sumamente irritado
+  - pacing and leading: Técnica de modular la voz para calmar al interlocutor
+  - framework: Marco de trabajo o metodología estructurada
+  - within my power: Dentro de mis facultades o alcance
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Simulación: Desescalando a un Cliente Molesto
+• Duración de Audio: 1:25 min
+• Guión en Inglés:
+  Customer (Robert): This is absolute garbage! I have been transferred three times and your system deleted my flight reservation! I want someone fired!
+  Agent (Diana): Mr. Vance, I hear you, and you have every right to be angry. Being transferred three times when your flight is on the line is completely unacceptable.
+  Customer (Robert): Exactly! Finally someone who gets it.
+  Agent (Diana): I am not going to transfer you anywhere. My name is Diana, and I am taking personal ownership of your ticket right now until you are safely booked on your flight. Let us fix this together.
+
+• Traducción en Español:
+  Cliente (Robert): ¡Esto es una absoluta basura! ¡Me han transferido tres veces y su sistema borró mi reserva de vuelo! ¡Quiero que despidan a alguien!
+  Agente (Diana): Sr. Vance, lo escucho, y tiene todo el derecho de estar molesto. Que lo transfieran tres veces con su vuelo en juego es totalmente inaceptable.
+  Cliente (Robert): ¡Exactamente! Por fin alguien que lo entiende.
+  Agente (Diana): No lo voy a transferir a ningún lado. Mi nombre es Diana, y asumo la responsabilidad personal de su caso en este momento hasta que esté registrado en su vuelo. Resolvamos esto juntos.
+
+• Cápsula Cultural / Pragmática BPO:
+  "Tomar 'propiedad personal' ('I am taking personal ownership') desactiva de inmediato la furia del cliente angloparlante porque ya no se siente una pelota rebotando entre departamentos."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "You have every right to feel upset, and I sincerely apologize for what you experienced."
+     -> Tiene todo el derecho de sentirse molesto, y me disculpo sinceramente por lo que experimentó. (Contexto: Validación)
+  2. "I am taking personal ownership of this call and will stay with you until it is resolved."
+     -> Asumo responsabilidad personal de esta llamada y me quedaré con usted hasta resolverlo. (Contexto: Propiedad personal)
+  3. "I understand your frustration, and I am here to find a workable solution right now."
+     -> Entiendo su frustración y estoy aquí para encontrar una solución viable justo ahora. (Contexto: Asertividad)
+
+
+--------------------------------------------------------------------------------
+NODO 3.2: Límites Profesionales, Políticas y Escalación al Supervisor
+Código: 3.2 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: Professional Boundaries & Warm Escalations
+• Resumen: Cómo transferir a un supervisor con un traspaso cálido (warm transfer) y poner límites al lenguaje ofensivo.
+• Texto Completo:
+  "Every BPO contract defines clear boundary guidelines. If a caller resorts to profanity or personal insults, agents must deliver two polite warnings before initiating a disconnected call protocol.
+
+  When a customer insists on speaking with a supervisor, perform a 'warm transfer'. A warm transfer means you brief the supervisor on the full backstory before connecting the caller, preventing the customer from repeating their ordeal.
+
+  Frame policies positively: instead of 'I cannot do that', use 'What I can do for you is apply a $50 credit and consult my manager for an exception.'"
+
+• Glosario Interactivo SRS:
+  - warm transfer: Transferencia con briefing previo al supervisor
+  - cold transfer: Transferencia ciega sin avisar (práctica prohibida en BPO)
+  - profanity: Lenguaje soez o insultos verbales
+  - brief: Informar brevemente los hechos del caso al compañero
+  - exception: Excepción a la regla o política comercial
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Traspaso Profesional: Briefing Interno con el Supervisor
+• Duración de Audio: 1:18 min
+• Guión en Inglés:
+  Agent (Tom): Hey Sarah, I have Mr. Davis on line 2. His shipment arrived damaged for the second time. I already verified the account and approved a $75 credit, but he is requesting overnight courier replacement which requires tier 3 authorization.
+  Supervisor (Sarah): Great summary, Tom. Does he have the damaged tracking number ready?
+  Agent (Tom): Yes, it is documented in case notes #4910.
+  Supervisor (Sarah): Perfect, patch him through, I will take the call.
+  Agent (Tom): [To Customer] Mr. Davis, thank you for waiting. I have my floor supervisor Sarah on the line, and she is fully briefed on your situation.
+
+• Traducción en Español:
+  Agente (Tom): Hola Sarah, tengo al Sr. Davis en la línea 2. Su envío llegó dañado por segunda vez. Ya verifiqué la cuenta y aprobé un crédito de $75, pero solicita reemplazo por mensajería nocturna lo cual requiere autorización nivel 3.
+  Supervisora (Sarah): Excelente resumen, Tom. ¿Tiene listo el número de rastreo dañado?
+  Agente (Tom): Sí, está documentado en las notas del caso #4910.
+  Supervisora (Sarah): Perfecto, pásamelo, tomaré la llamada.
+  Agente (Tom): [Al cliente] Sr. Davis, gracias por esperar. Tengo a mi supervisora Sarah en línea y está totalmente informada de su situación.
+
+• Cápsula Cultural / Pragmática BPO:
+  "Decirle al cliente que el supervisor ya está informado ('she is fully briefed') le genera un alivio instantáneo al no tener que volver a contar su historia desde cero."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "I want to help you, but I must respectfully ask that we keep our conversation professional."
+     -> Quiero ayudarle, pero debo pedirle respetuosamente mantener la conversación profesional. (Contexto: Límites ante insultos)
+  2. "I am going to connect you with my supervisor and brief her so you do not have to repeat yourself."
+     -> Voy a conectarlo con mi supervisora e informarla para que no tenga que repetirse. (Contexto: Warm transfer)
+  3. "What I can certainly do for you right now is submit an expedited review ticket."
+     -> Lo que ciertamente puedo hacer por usted ahora mismo es enviar un ticket de revisión expedita. (Contexto: Enfoque positivo)
+
+
+
+================================================================================
+MÓDULO 4 • SOPORTE & CIERRE (WRAP-UP, CSAT & CLOSING)
+================================================================================
+Objetivo: Garantizar que la solución sea total antes de colgar (FCR), fidelizar al cliente,
+asegurar encuestas de satisfacción con calificaciones sobresalientes (CSAT 5 estrellas)
+y redactar notas estandarizadas en el CRM durante el tiempo de Wrap-up (ACW).
+================================================================================
+
+--------------------------------------------------------------------------------
+NODO 4.1: Confirmación de Solución y Calidad CSAT
+Código: 4.1 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: First Contact Resolution (FCR) & CSAT Score Optimization
+• Resumen: Cómo asegurar que el cliente no tenga que volver a llamar y garantizar calificaciones de 5 estrellas en encuestas.
+• Texto Completo:
+  "First Contact Resolution (FCR) and Customer Satisfaction (CSAT) are the two most scrutinized KPIs in global outsourcing operations. Resolving the stated issue is only half the battle; ensuring no secondary issues arise is the other half.
+
+  Before closing any call, perform a comprehensive solution check: 'We verified that your password reset worked, and we logged into your dashboard successfully. Is there any other device where you need access?'
+
+  This proactive step eliminates repeat calls within 48 hours and directly drives promoter scores on post-call automated surveys."
+
+• Glosario Interactivo SRS:
+  - First Contact Resolution (FCR): Resolución en el primer contacto
+  - CSAT (Customer Satisfaction): Métrica de satisfacción del cliente
+  - KPI (Key Performance Indicator): Indicador clave de rendimiento
+  - repeat call: Llamada repetida por el mismo motivo
+  - promoter score: Puntuación de recomendación del cliente
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Diálogo: Verificación Integral del Servicio
+• Duración de Audio: 1:12 min
+• Guión en Inglés:
+  Agent (Kevin): Wonderful, Mr. Miller! We just tested your backup email and confirmed your multi-factor codes are sending instantly. Have you received the test SMS?
+  Customer (Miller): Yes, just popped up on my phone. Everything is working like a charm.
+  Agent (Kevin): That is fantastic news! Aside from securing your login credentials, is there anything else I can take care of for you today to make your experience seamless?
+  Customer (Miller): No Kevin, you went above and beyond. Thanks a million.
+
+• Traducción en Español:
+  Agente (Kevin): ¡Maravilloso, Sr. Miller! Acabamos de probar su correo de respaldo y confirmamos que sus códigos de doble factor se envían al instante. ¿Recibió el SMS de prueba?
+  Cliente (Miller): Sí, acaba de aparecer en mi teléfono. Todo funciona a las mil maravillas.
+  Agente (Kevin): ¡Esa es una noticia fantástica! Aparte de asegurar sus credenciales de inicio de sesión, ¿hay algo más de lo que me pueda encargar por usted hoy para que su experiencia sea perfecta?
+  Cliente (Miller): No Kevin, fuiste más allá de lo esperado. Un millón de gracias.
+
+• Cápsula Cultural / Pragmática BPO:
+  "La frase 'went above and beyond' en la cultura corporativa estadounidense es el mayor cumplido que un cliente puede dar y garantiza un CSAT de 100%."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "Just to confirm, are you able to see the updated balance on your screen right now?"
+     -> Solo para confirmar, ¿puede ver el saldo actualizado en su pantalla ahora mismo? (Contexto: Verificación de solución)
+  2. "Is there anything else, large or small, that I can help you with today?"
+     -> ¿Hay algo más, grande o pequeño, con lo que pueda ayudarle hoy? (Contexto: Pregunta de cierre integral)
+  3. "We truly appreciate your loyalty with us over the past four years."
+     -> Realmente apreciamos su lealtad con nosotros durante los últimos cuatro años. (Contexto: Fidelización)
+
+
+--------------------------------------------------------------------------------
+NODO 4.2: Cierre Profesional de Llamada y Documentación de Ticket
+Código: 4.2 | Duración Estimada: 7 min | Recompensa XP: 70 XP
+--------------------------------------------------------------------------------
+
+[SUB-NODO READING: LECTURA GUIADA BPO]
+• Título: Call Wrap-up Standards & Case Documentation
+• Resumen: Cómo redactar notas concisas en el CRM y despedir al cliente dejando una impresión duradera.
+• Texto Completo:
+  "The final impression is what stays with the caller when they receive the survey. A branded closing statement reinforces the professional identity of the company and leaves the customer feeling valued.
+
+  The standard closing script follows: Warm thanks + Company brand + Good wishes. Example: 'Thank you for choosing Apex Wireless, Mr. Miller. Have a wonderful rest of your week!'
+
+  Immediately following call termination, agents enter Wrap-up status (ACW - After Call Work) to write case notes in CRM using the standard format: Caller Intent, Action Taken, Outcome, Follow-up Required."
+
+• Glosario Interactivo SRS:
+  - ACW (After Call Work): Tiempo posterior a la llamada para documentar notas
+  - branded closing: Despedida corporativa institucional
+  - case notes: Notas registradas en el software CRM de la empresa
+  - outcome: Resultado final del trámite o llamada
+  - follow-up: Seguimiento futuro acordado con el cliente
+
+[SUB-NODO LISTENING: AUDIO TELEFÓNICO REAL]
+• Título: Despedida Telefónica y Envío de Resumen por Email
+• Duración de Audio: 1:10 min
+• Guión en Inglés:
+  Agent (Rachel): You will also receive an email confirmation with your case ticket number #8841 within the next ten minutes for your records.
+  Customer (Thomas): That is great, thanks for sending that over.
+  Agent (Rachel): It has been an absolute pleasure assisting you today, Mr. Thomas. Thank you for choosing CloudPay solutions, and have a fantastic weekend ahead!
+  Customer (Thomas): You too Rachel, bye now!
+  Agent (Rachel): Goodbye!
+
+• Traducción en Español:
+  Agente (Rachel): También recibirá una confirmación por correo electrónico con su número de ticket #8841 en los próximos diez minutos para su archivo personal.
+  Cliente (Thomas): Genial, gracias por enviarlo.
+  Agente (Rachel): Ha sido un absoluto placer asistirle hoy, Sr. Thomas. ¡Gracias por elegir las soluciones CloudPay, y que tenga un fantástico fin de semana!
+  Cliente (Thomas): ¡Igualmente Rachel, adiós!
+  Agente (Rachel): ¡Hasta luego!
+
+• Cápsula Cultural / Pragmática BPO:
+  "Deseos específicos ('have a fantastic weekend' o 'enjoy your evening') suenan mucho más cálidos que un simple 'have a good day'."
+
+[SUB-NODO SRS: FRASES CLAVE PARA REPETICIÓN ESPACIADA]
+  1. "Your confirmation ticket number is documented as #8841."
+     -> Su número de ticket de confirmación queda registrado como #8841. (Contexto: Número de ticket)
+  2. "It has been an absolute pleasure assisting you today."
+     -> Ha sido un absoluto placer asistirle el día de hoy. (Contexto: Cortesía final)
+  3. "Thank you for calling support, and have a wonderful rest of your day!"
+     -> ¡Gracias por llamar a soporte y que tenga un maravilloso resto del día! (Contexto: Despedida cordial)
+
+================================================================================
+FIN DEL CURRICULUM • NATIVA BPO SPECIALIZATION
+================================================================================

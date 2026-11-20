@@ -183,15 +183,28 @@ export default function FluentiaDashboardPage() {
               </div>
             </div>
 
-            {/* Botón Principal Grande de Acción */}
-            <Link
-              href="/learn/english"
-              onClick={() => soundManager.playClick()}
-              className="w-full md:w-auto px-8 py-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:opacity-95 text-slate-950 font-black text-base transition shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-3 group active:scale-95 shrink-0"
-            >
-              <span>Continuar aprendiendo Inglés</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            {/* Botones Principales de Acción (Inglés General + Track BPO Call Center) */}
+            <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-stretch gap-3 w-full md:w-auto shrink-0">
+              <Link
+                href="/learn/english"
+                onClick={() => soundManager.playClick()}
+                className="px-6 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:opacity-95 text-slate-950 font-black text-sm sm:text-base transition shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2.5 group active:scale-95"
+              >
+                <GraduationCap className="w-5 h-5 shrink-0" />
+                <span>Continuar Inglés General</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform shrink-0" />
+              </Link>
+
+              <Link
+                href="/learn/english/call-center"
+                onClick={() => soundManager.playClick()}
+                className="px-6 py-4 rounded-2xl bg-gradient-to-r from-orange-600 via-amber-600 to-red-600 hover:opacity-95 text-white font-black text-sm sm:text-base transition shadow-xl shadow-orange-600/30 border border-orange-400/40 flex items-center justify-center gap-2.5 group active:scale-95 ring-2 ring-orange-500/20"
+              >
+                <Headphones className="w-5 h-5 text-amber-200 shrink-0" />
+                <span>Ruta Call Center BPO</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform shrink-0" />
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -219,26 +232,27 @@ export default function FluentiaDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {/* Tarjeta 1: CALL CENTER ENGLISH (ACTIVO) */}
-            <div className="rounded-3xl p-6 bg-gradient-to-br from-[#120e06] via-[#0f0c08] to-[#070b14] border-2 border-amber-500/50 shadow-xl shadow-amber-500/10 flex flex-col justify-between relative overflow-hidden group hover:border-amber-400 transition-all">
-              {/* Brillo de acento */}
-              <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-500/15 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-500/25 transition-colors" />
+            {/* Tarjeta 1: CALL CENTER ENGLISH (ACTIVO - COLOR NARANJA / ROJO CORPORATIVO) */}
+            <div className="rounded-3xl p-6 bg-gradient-to-br from-[#1c0c06] via-[#140804] to-[#070b14] border-2 border-orange-500/60 shadow-xl shadow-orange-500/15 flex flex-col justify-between relative overflow-hidden group hover:border-orange-400 transition-all">
+              {/* Brillo de acento naranja/rojo */}
+              <div className="absolute -right-10 -top-10 w-44 h-44 bg-orange-600/20 rounded-full blur-2xl pointer-events-none group-hover:bg-orange-500/30 transition-colors" />
 
               <div className="space-y-4 relative z-10">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 text-slate-950 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-600 via-amber-500 to-red-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-orange-600/30 group-hover:scale-110 transition-transform">
                     <Headphones className="w-7 h-7" />
                   </div>
-                  <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-[11px] font-mono font-bold text-amber-300">
-                    BPO & Soporte
+                  <span className="px-3 py-1 rounded-full bg-orange-950/80 border border-orange-500/50 text-[11px] font-mono font-bold text-orange-300 flex items-center gap-1.5 shadow-sm">
+                    <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                    BPO & Call Center Pro
                   </span>
                 </div>
 
                 <div>
-                  <h3 className="text-xl font-black text-white group-hover:text-amber-300 transition-colors">
+                  <h3 className="text-xl font-black text-white group-hover:text-orange-300 transition-colors">
                     Call Center English
                   </h3>
-                  <p className="text-xs font-medium text-amber-400/90 font-mono mt-0.5">
+                  <p className="text-xs font-semibold text-orange-400/95 font-mono mt-0.5">
                     Call Center & Customer Service Pro
                   </p>
                 </div>
@@ -249,21 +263,21 @@ export default function FluentiaDashboardPage() {
 
                 {/* Resumen de Módulos */}
                 <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[11px] font-mono">
-                  <div className="p-2 rounded-xl bg-black/40 border border-slate-800/80">
+                  <div className="p-2 rounded-xl bg-black/50 border border-orange-950/60">
                     <span className="text-slate-400 block text-[10px]">Estructura:</span>
-                    <strong className="text-amber-300">4 Módulos</strong>
+                    <strong className="text-orange-300 font-bold">4 Módulos BPO</strong>
                   </div>
-                  <div className="p-2 rounded-xl bg-black/40 border border-slate-800/80">
+                  <div className="p-2 rounded-xl bg-black/50 border border-orange-950/60">
                     <span className="text-slate-400 block text-[10px]">Nivel:</span>
-                    <strong className="text-orange-300">B1 - B2 Pro</strong>
+                    <strong className="text-amber-300 font-bold">B1 - B2 Pro</strong>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-mono text-slate-400">
-                  <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800">1. Primer Contacto</span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800">2. Resolución</span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800">3. Cliente Difícil</span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800">4. Soporte & Cierre</span>
+                  <span className="px-2 py-0.5 rounded-md bg-orange-950/30 border border-orange-900/40 text-orange-200">1. Primer Contacto</span>
+                  <span className="px-2 py-0.5 rounded-md bg-orange-950/30 border border-orange-900/40 text-orange-200">2. Resolución</span>
+                  <span className="px-2 py-0.5 rounded-md bg-orange-950/30 border border-orange-900/40 text-orange-200">3. Cliente Difícil</span>
+                  <span className="px-2 py-0.5 rounded-md bg-orange-950/30 border border-orange-900/40 text-orange-200">4. Soporte & Cierre</span>
                 </div>
               </div>
 
@@ -271,9 +285,9 @@ export default function FluentiaDashboardPage() {
                 <Link
                   href="/learn/english/call-center"
                   onClick={() => soundManager.playClick()}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-400 to-amber-600 hover:opacity-95 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-600 via-amber-600 to-red-600 hover:opacity-95 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 active:scale-95 transition"
                 >
-                  <Headphones className="w-4 h-4" />
+                  <Headphones className="w-4 h-4 text-amber-200" />
                   <span>Iniciar Ruta de Call Center</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
