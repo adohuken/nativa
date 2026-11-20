@@ -219,7 +219,23 @@ export default function AdminDashboardPage() {
     elevenlabs: false
   });
   const [testingProvider, setTestingProvider] = useState<AiProvider | null>(null);
-  const [testResults, setTestResults] = useState<Record<AiProvider, { success: boolean; message: string; latencyMs: number } | null>>({
+  const [isBatchTesting, setIsBatchTesting] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; currentProviderName?: string } | null>(null);
+  const [testResults, setTestResults] = useState<Record<AiProvider, {
+    success: boolean;
+    message: string;
+    latencyMs: number;
+    quotaInfo?: {
+      tier?: string;
+      tokensPerMinute?: string;
+      requestsPerMinute?: string;
+      remainingCredits?: string;
+      usage?: string;
+      limit?: string;
+      estimatedDailyTokens?: string;
+      details?: string;
+    };
+  } | null>>({
     gemini: null,
     groq: null,
     cerebras: null,
@@ -302,7 +318,8 @@ export default function AdminDashboardPage() {
         [provider]: {
           success: data.success,
           message: data.message,
-          latencyMs: data.latencyMs || 0
+          latencyMs: data.latencyMs || 0,
+          quotaInfo: data.quotaInfo
         }
       }));
 
@@ -338,6 +355,99 @@ export default function AdminDashboardPage() {
     } finally {
       setTestingProvider(null);
     }
+  };
+
+  // DIAGNÓSTICO EN LOTE: PROBAR TODAS LAS APIS A LA VEZ
+  const handleTestAllProviders = async () => {
+    const allProviders: AiProvider[] = [
+      'gemini', 'groq', 'cerebras', 'openrouter', 'mistral',
+      'cohere', 'cloudflare', 'openai', 'deepseek', 'elevenlabs'
+    ];
+
+    const configured = allProviders.filter(
+      p => aiSettings.providers[p]?.key && aiSettings.providers[p].key.trim().length > 5
+    );
+
+    if (configured.length === 0) {
+      setSaveSuccessNotice('⚠️ No hay ninguna API Key ingresada aún. Pega tus claves para diagnosticarlas.');
+      soundManager.playGentleError();
+      setTimeout(() => setSaveSuccessNotice(null), 4000);
+      return;
+    }
+
+    setIsBatchTesting(true);
+    setBatchProgress({ current: 0, total: configured.length });
+    soundManager.playClick();
+
+    let successfulCount = 0;
+    let totalLatency = 0;
+
+    for (let i = 0; i < configured.length; i++) {
+      const p = configured[i];
+      const pInfo = PROVIDER_INFO[p];
+      setBatchProgress({ current: i + 1, total: configured.length, currentProviderName: pInfo.name });
+      setTestingProvider(p);
+
+      try {
+        const res = await fetch('/api/ai/test-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: p,
+            apiKey: aiSettings.providers[p].key,
+            model: aiSettings.providers[p].model
+          })
+        });
+
+        const data = await res.json();
+        setTestResults(prev => ({
+          ...prev,
+          [p]: {
+            success: data.success,
+            message: data.message,
+            latencyMs: data.latencyMs || 0,
+            quotaInfo: data.quotaInfo
+          }
+        }));
+
+        setAiSettings(prev => ({
+          ...prev,
+          providers: {
+            ...prev.providers,
+            [p]: {
+              ...prev.providers[p],
+              testStatus: data.success ? 'success' : 'error',
+              testMessage: data.message,
+              latencyMs: data.latencyMs,
+              lastTestedAt: new Date().toISOString()
+            }
+          }
+        }));
+
+        if (data.success) {
+          successfulCount++;
+          totalLatency += (data.latencyMs || 0);
+        }
+      } catch (err) {
+        setTestResults(prev => ({
+          ...prev,
+          [p]: {
+            success: false,
+            message: 'Error de red al conectar',
+            latencyMs: 0
+          }
+        }));
+      }
+    }
+
+    setIsBatchTesting(false);
+    setTestingProvider(null);
+    setBatchProgress(null);
+
+    const avgLatency = successfulCount > 0 ? Math.round(totalLatency / successfulCount) : 0;
+    soundManager.playVictory();
+    setSaveSuccessNotice(`✓ Diagnóstico en lote completado: ${successfulCount} de ${configured.length} APIs operativas (Latencia promedio: ${avgLatency} ms)`);
+    setTimeout(() => setSaveSuccessNotice(null), 5000);
   };
 
   const handleSaveAiSettings = () => {
@@ -2235,298 +2345,460 @@ export default function AdminDashboardPage() {
         {/* ===================================================================
             6. PESTAÑA: CONFIGURACIÓN DE APIS Y MODELOS DE IA
         =================================================================== */}
-        {activeTab === 'API_KEYS' && (
-          <div className="p-6 md:p-8 space-y-6">
+        {activeTab === 'API_KEYS' && (() => {
+          const allProviderKeys: AiProvider[] = ['gemini', 'groq', 'cerebras', 'openrouter', 'mistral', 'cohere', 'cloudflare', 'openai', 'deepseek', 'elevenlabs'];
+          const configuredCount = allProviderKeys.filter(p => aiSettings.providers[p]?.key && aiSettings.providers[p].key.trim().length > 5).length;
+          const successfulList = allProviderKeys.filter(p => testResults[p]?.success);
+          const testedCount = allProviderKeys.filter(p => testResults[p] !== null).length;
+          const avgLatency = successfulList.length > 0
+            ? Math.round(successfulList.reduce((acc, p) => acc + (testResults[p]?.latencyMs || 0), 0) / successfulList.length)
+            : 0;
 
-            {/* Cabecera Principal */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                    Centro de Integraciones de IA
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400">
-                    Control de Inferencia & LLMs
-                  </span>
-                </div>
-                <h2 className="text-xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
-                  <Key className="w-5 h-5 text-amber-400" />
-                  <span>Configuración de APIs & Proveedores de IA</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Conecta tus claves de Google Gemini, Groq, OpenAI, DeepSeek y ElevenLabs. Soporta rotador de contingencia automático.
-                </p>
-              </div>
+          return (
+            <div className="p-6 md:p-8 space-y-6">
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCopyEnvFormat}
-                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
-                  title="Copiar todas las variables formateadas para .env.local"
-                >
-                  <Copy className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{copiedEnvNotice ? '¡Copiado!' : 'Copiar formato .env'}</span>
-                </button>
-
-                <button
-                  onClick={handleSaveAiSettings}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Guardar Claves</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ORQUESTRACIÓN DEL ROTADOR INTELIGENTE (FAILOVER & REDUNDANCIA) */}
-            <div className="p-5 rounded-2xl bg-[#080d16] border border-amber-500/30 shadow-lg space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-amber-950/80 border border-amber-500/40 text-amber-400 flex items-center justify-center">
-                    <Cpu className="w-4 h-4" />
+              {/* Cabecera Principal */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                      Centro de Integraciones & Token Lake
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      10 Motores de Inferencia Configurados
+                    </span>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-white">Orquestador de Rotación y Respaldo Inteligente</h3>
-                    <p className="text-[11px] text-slate-400">Si un proveedor agota su cuota de peticiones (429 Rate Limit), la plataforma salta al respaldo sin fricción.</p>
-                  </div>
+                  <h2 className="text-xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
+                    <Key className="w-5 h-5 text-amber-400" />
+                    <span>Configuración de APIs, Tokens & Diagnóstico</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Verifica la funcionalidad de tus claves, consulta saldos y monitorea los límites de cuota (TPM/RPM) de cada motor.
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-slate-300 font-bold">Auto-Failover:</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Botón Diagnosticar Todas las APIs */}
                   <button
-                    onClick={() => setAiSettings(prev => ({ ...prev, enableAutoFailover: !prev.enableAutoFailover }))}
-                    className="cursor-pointer"
+                    onClick={handleTestAllProviders}
+                    disabled={isBatchTesting}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
+                    title="Ejecuta un ping de prueba en lote a todas las claves configuradas"
                   >
-                    {aiSettings.enableAutoFailover ? (
-                      <ToggleRight className="w-6 h-6 text-emerald-400" />
-                    ) : (
-                      <ToggleLeft className="w-6 h-6 text-slate-600" />
-                    )}
+                    <RotateCcw className={`w-4 h-4 ${isBatchTesting ? 'animate-spin' : ''}`} />
+                    <span>
+                      {isBatchTesting
+                        ? `Probando [${batchProgress?.current || 0}/${batchProgress?.total || 0}] ${batchProgress?.currentProviderName || ''}...`
+                        : '⚡ Probar Todas las APIs a la Vez'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={handleCopyEnvFormat}
+                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+                    title="Copiar todas las variables formateadas para .env.local"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{copiedEnvNotice ? '¡Copiado!' : 'Copiar .env'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleSaveAiSettings}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Guardar Todo</span>
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
-                {/* Proveedor Principal */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
-                    1. Proveedor Principal:
-                  </label>
-                  <select
-                    value={aiSettings.primaryProvider}
-                    onChange={(e) => setAiSettings(prev => ({ ...prev, primaryProvider: e.target.value as AiProvider }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
-                  >
-                    <option value="gemini">Google Gemini (Recomendado)</option>
-                    <option value="groq">Groq Cloud (500+ tokens/s)</option>
-                    <option value="cerebras">Cerebras (2,000+ tokens/s)</option>
-                    <option value="openrouter">OpenRouter (Hub 200+ Modelos)</option>
-                    <option value="mistral">Mistral AI (Multilingüe Europeo)</option>
-                    <option value="cohere">Cohere (Command R+)</option>
-                    <option value="cloudflare">Cloudflare Workers AI (Edge)</option>
-                    <option value="openai">OpenAI (GPT-4o Mini)</option>
-                    <option value="deepseek">DeepSeek AI (Bajo Costo)</option>
-                  </select>
-                </div>
-
-                {/* Proveedor de Respaldo */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
-                    2. Proveedor de Respaldo (Fallback):
-                  </label>
-                  <select
-                    value={aiSettings.fallbackProvider}
-                    onChange={(e) => setAiSettings(prev => ({ ...prev, fallbackProvider: e.target.value as AiProvider }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
-                  >
-                    <option value="groq">Groq Cloud (Llama 3.3 70B)</option>
-                    <option value="cerebras">Cerebras (Hiper-Velocidad)</option>
-                    <option value="openrouter">OpenRouter (Respaldo Universal)</option>
-                    <option value="mistral">Mistral AI (Mistral Small)</option>
-                    <option value="cohere">Cohere (Command R)</option>
-                    <option value="cloudflare">Cloudflare Workers AI</option>
-                    <option value="gemini">Google Gemini (Gemini 2.0 Flash)</option>
-                    <option value="deepseek">DeepSeek AI (DeepSeek V3)</option>
-                    <option value="openai">OpenAI (GPT-4o Mini)</option>
-                  </select>
-                </div>
-
-                {/* Temperatura Pedagógica */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 font-bold">
-                    <span>Temperatura SLA:</span>
-                    <span className="text-amber-400">{aiSettings.temperature}</span>
+              {/* BARRA DE PROGRESO DE DIAGNÓSTICO EN LOTE */}
+              {isBatchTesting && batchProgress && (
+                <div className="p-3.5 rounded-2xl bg-[#080d16] border border-cyan-500/40 space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-cyan-300 font-bold flex items-center gap-1.5">
+                      <RotateCcw className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                      Diagnóstico en progreso: Probando {batchProgress.currentProviderName}...
+                    </span>
+                    <span className="text-slate-400">
+                      {batchProgress.current} de {batchProgress.total} claves
+                    </span>
                   </div>
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="1.0"
-                    step="0.05"
-                    value={aiSettings.temperature}
-                    onChange={(e) => setAiSettings(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
-                    className="w-full accent-amber-400 h-2 bg-slate-800 rounded-lg cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[9px] font-mono text-slate-500">
-                    <span>0.2 (Rígido)</span>
-                    <span>0.7 (Pedagógico i+1)</span>
-                    <span>1.0 (Creativo)</span>
+                  <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-full transition-all duration-300"
+                      style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 4 TARJETAS DEL MONITOR GLOBAL DE TOKENS & CAPACIDAD */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Estado de la Red */}
+                <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800 shadow-sm space-y-1">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[11px] font-mono font-bold uppercase">Estado de la Red</span>
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="text-2xl font-black text-white flex items-center gap-2">
+                    <span>{successfulList.length}</span>
+                    <span className="text-xs font-mono text-slate-400 font-normal">/ {configuredCount} conectadas</span>
+                  </div>
+                  <div className="text-[10px] font-mono text-emerald-400">
+                    {successfulList.length > 0 ? '✓ Red de inferencia operativa' : 'Sin diagnóstico reciente'}
+                  </div>
+                </div>
+
+                {/* 2. Capacidad Diaria Estimada */}
+                <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800 shadow-sm space-y-1">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[11px] font-mono font-bold uppercase">Tokens Diarios Reunidos</span>
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="text-2xl font-black text-amber-300">
+                    ~{configuredCount > 0 ? (configuredCount * 500000).toLocaleString() : '0'}+
+                  </div>
+                  <div className="text-[10px] font-mono text-amber-400">
+                    Equivale a ~{configuredCount > 0 ? (configuredCount * 250).toLocaleString() : '0'} historias completas/día
+                  </div>
+                </div>
+
+                {/* 3. Latencia Promedio */}
+                <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800 shadow-sm space-y-1">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[11px] font-mono font-bold uppercase">Latencia Promedio</span>
+                    <Cpu className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div className="text-2xl font-black text-white">
+                    {avgLatency > 0 ? `${avgLatency} ms` : '—'}
+                  </div>
+                  <div className="text-[10px] font-mono text-cyan-400">
+                    {avgLatency > 0 && avgLatency < 300 ? '⚡ Ultra Rápida (LPU / CS-3)' : 'Tiempo de respuesta'}
+                  </div>
+                </div>
+
+                {/* 4. Créditos / Saldos Detectados */}
+                <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800 shadow-sm space-y-1">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[11px] font-mono font-bold uppercase">Saldos Detectados</span>
+                    <Key className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="text-sm font-black text-purple-300 truncate">
+                    {testResults.openrouter?.quotaInfo?.remainingCredits
+                      ? `OpenRouter: ${testResults.openrouter.quotaInfo.remainingCredits}`
+                      : testResults.elevenlabs?.quotaInfo?.remainingCredits
+                      ? `ElevenLabs: ${testResults.elevenlabs.quotaInfo.remainingCredits}`
+                      : 'Listo para diagnosticar'}
+                  </div>
+                  <div className="text-[10px] font-mono text-purple-400 truncate">
+                    {testResults.elevenlabs?.quotaInfo?.usage
+                      ? `ElevenLabs uso: ${testResults.elevenlabs.quotaInfo.usage}`
+                      : 'Saldos directos por API'}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* LISTA DE TARJETAS DE CADA PROVEEDOR */}
-            <div className="space-y-4">
-              {(['gemini', 'groq', 'cerebras', 'openrouter', 'mistral', 'cohere', 'cloudflare', 'openai', 'deepseek', 'elevenlabs'] as AiProvider[]).map((providerKey) => {
-                const info = PROVIDER_INFO[providerKey];
-                const config = aiSettings.providers[providerKey];
-                const testResult = testResults[providerKey];
-                const isTesting = testingProvider === providerKey;
-                const isConfigured = Boolean(config?.key && config.key.trim().length > 5);
+              {/* ORQUESTRACIÓN DEL ROTADOR INTELIGENTE (FAILOVER & REDUNDANCIA) */}
+              <div className="p-5 rounded-2xl bg-[#080d16] border border-amber-500/30 shadow-lg space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-950/80 border border-amber-500/40 text-amber-400 flex items-center justify-center">
+                      <Cpu className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white">Orquestador de Rotación y Respaldo Inteligente</h3>
+                      <p className="text-[11px] text-slate-400">Si un proveedor agota su cuota de peticiones (429 Rate Limit), la plataforma salta al respaldo sin fricción.</p>
+                    </div>
+                  </div>
 
-                return (
-                  <div
-                    key={providerKey}
-                    className="p-5 rounded-2xl bg-[#090e1a] border border-slate-800/90 hover:border-slate-700 transition space-y-4 shadow-sm"
-                  >
-                    {/* Header de la Tarjeta */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${info.color} text-slate-950 font-black flex items-center justify-center text-xs shadow-md`}>
-                          {info.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-black text-white">{info.name}</h3>
-                            <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
-                              {info.badge}
-                            </span>
-                            {isConfigured ? (
-                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold flex items-center gap-1">
-                                <ShieldCheck className="w-3 h-3" /> Configurada
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-mono text-slate-500 bg-slate-900 border border-slate-800 px-1.5 py-0.2 rounded">
-                                Sin configurar
-                              </span>
-                            )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono text-slate-300 font-bold">Auto-Failover:</span>
+                    <button
+                      onClick={() => setAiSettings(prev => ({ ...prev, enableAutoFailover: !prev.enableAutoFailover }))}
+                      className="cursor-pointer"
+                    >
+                      {aiSettings.enableAutoFailover ? (
+                        <ToggleRight className="w-6 h-6 text-emerald-400" />
+                      ) : (
+                        <ToggleLeft className="w-6 h-6 text-slate-600" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
+                  {/* Proveedor Principal */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                      1. Proveedor Principal:
+                    </label>
+                    <select
+                      value={aiSettings.primaryProvider}
+                      onChange={(e) => setAiSettings(prev => ({ ...prev, primaryProvider: e.target.value as AiProvider }))}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+                    >
+                      <option value="gemini">Google Gemini (Recomendado)</option>
+                      <option value="groq">Groq Cloud (500+ tokens/s)</option>
+                      <option value="cerebras">Cerebras (2,000+ tokens/s)</option>
+                      <option value="openrouter">OpenRouter (Hub 200+ Modelos)</option>
+                      <option value="mistral">Mistral AI (Multilingüe Europeo)</option>
+                      <option value="cohere">Cohere (Command R+)</option>
+                      <option value="cloudflare">Cloudflare Workers AI (Edge)</option>
+                      <option value="openai">OpenAI (GPT-4o Mini)</option>
+                      <option value="deepseek">DeepSeek AI (Bajo Costo)</option>
+                    </select>
+                  </div>
+
+                  {/* Proveedor de Respaldo */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                      2. Proveedor de Respaldo (Fallback):
+                    </label>
+                    <select
+                      value={aiSettings.fallbackProvider}
+                      onChange={(e) => setAiSettings(prev => ({ ...prev, fallbackProvider: e.target.value as AiProvider }))}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+                    >
+                      <option value="groq">Groq Cloud (Llama 3.3 70B)</option>
+                      <option value="cerebras">Cerebras (Hiper-Velocidad)</option>
+                      <option value="openrouter">OpenRouter (Respaldo Universal)</option>
+                      <option value="mistral">Mistral AI (Mistral Small)</option>
+                      <option value="cohere">Cohere (Command R)</option>
+                      <option value="cloudflare">Cloudflare Workers AI</option>
+                      <option value="gemini">Google Gemini (Gemini 2.0 Flash)</option>
+                      <option value="deepseek">DeepSeek AI (DeepSeek V3)</option>
+                      <option value="openai">OpenAI (GPT-4o Mini)</option>
+                    </select>
+                  </div>
+
+                  {/* Temperatura Pedagógica */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 font-bold">
+                      <span>Temperatura SLA:</span>
+                      <span className="text-amber-400">{aiSettings.temperature}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.2"
+                      max="1.0"
+                      step="0.05"
+                      value={aiSettings.temperature}
+                      onChange={(e) => setAiSettings(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                      className="w-full accent-amber-400 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                      <span>0.2 (Rígido)</span>
+                      <span>0.7 (Pedagógico i+1)</span>
+                      <span>1.0 (Creativo)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* LISTA DE TARJETAS DE CADA PROVEEDOR CON DIAGNÓSTICO ENRIQUECIDO */}
+              <div className="space-y-4">
+                {allProviderKeys.map((providerKey) => {
+                  const info = PROVIDER_INFO[providerKey];
+                  const config = aiSettings.providers[providerKey];
+                  const testResult = testResults[providerKey];
+                  const isTesting = testingProvider === providerKey;
+                  const isConfigured = Boolean(config?.key && config.key.trim().length > 5);
+
+                  return (
+                    <div
+                      key={providerKey}
+                      className="p-5 rounded-2xl bg-[#090e1a] border border-slate-800/90 hover:border-slate-700 transition space-y-4 shadow-sm"
+                    >
+                      {/* Header de la Tarjeta */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${info.color} text-slate-950 font-black flex items-center justify-center text-xs shadow-md`}>
+                            {info.name.slice(0, 2).toUpperCase()}
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">{info.description}</p>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-sm font-black text-white">{info.name}</h3>
+                              <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+                                {info.badge}
+                              </span>
+                              {testResult?.success ? (
+                                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                  ✓ Conexión Activa ({testResult.latencyMs} ms)
+                                </span>
+                              ) : isConfigured ? (
+                                <span className="text-[10px] font-mono text-teal-400 bg-teal-950/60 border border-teal-500/30 px-1.5 py-0.2 rounded font-bold flex items-center gap-1">
+                                  <ShieldCheck className="w-3 h-3" /> Clave Guardada
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono text-slate-500 bg-slate-900 border border-slate-800 px-1.5 py-0.2 rounded">
+                                  Sin configurar
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">{info.description}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 self-start sm:self-auto">
+                          <a
+                            href={info.dashboardUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 hover:underline font-bold"
+                          >
+                            <span>Consola / Ver Saldo</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
                         </div>
                       </div>
 
-                      <a
-                        href={info.dashboardUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 self-start sm:self-auto hover:underline"
-                      >
-                        <span>Obtener clave en consola</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
+                      {/* Fila de Input de Key y Selector de Modelo */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-2 border-t border-slate-800/80">
+                        {/* Campo API Key con Toggle de Visibilidad */}
+                        <div className="lg:col-span-7 space-y-1">
+                          <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                            Clave API Secreta (API Key):
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showKeys[providerKey] ? 'text' : 'password'}
+                              value={config?.key || ''}
+                              onChange={(e) => handleKeyChange(providerKey, e.target.value)}
+                              placeholder={`Pega tu clave ${info.placeholder}`}
+                              className="w-full pl-3.5 pr-10 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-amber-400 placeholder:text-slate-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowKeys(prev => ({ ...prev, [providerKey]: !prev[providerKey] }))}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 cursor-pointer"
+                              title={showKeys[providerKey] ? 'Ocultar clave' : 'Mostrar clave'}
+                            >
+                              {showKeys[providerKey] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
 
-                    {/* Fila de Input de Key y Selector de Modelo */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-2 border-t border-slate-800/80">
-                      {/* Campo API Key con Toggle de Visibilidad */}
-                      <div className="lg:col-span-7 space-y-1">
-                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
-                          Clave API Secreta (API Key):
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showKeys[providerKey] ? 'text' : 'password'}
-                            value={config?.key || ''}
-                            onChange={(e) => handleKeyChange(providerKey, e.target.value)}
-                            placeholder={`Pega tu clave ${info.placeholder}`}
-                            className="w-full pl-3.5 pr-10 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-amber-400 placeholder:text-slate-600"
-                          />
+                        {/* Selector de Modelo */}
+                        <div className="lg:col-span-3 space-y-1">
+                          <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                            Modelo Asignado:
+                          </label>
+                          <select
+                            value={config?.model || info.models[0]?.id}
+                            onChange={(e) => handleModelChange(providerKey, e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-400 font-mono"
+                          >
+                            {info.models.map(m => (
+                              <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Botón de Probar Conexión */}
+                        <div className="lg:col-span-2 flex items-end">
                           <button
                             type="button"
-                            onClick={() => setShowKeys(prev => ({ ...prev, [providerKey]: !prev[providerKey] }))}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 cursor-pointer"
-                            title={showKeys[providerKey] ? 'Ocultar clave' : 'Mostrar clave'}
+                            disabled={isTesting}
+                            onClick={() => handleTestProvider(providerKey)}
+                            className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                              isConfigured
+                                ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                                : 'bg-slate-900 text-slate-500 border border-slate-800'
+                            } disabled:opacity-50`}
                           >
-                            {showKeys[providerKey] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            <RotateCcw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin text-amber-400' : ''}`} />
+                            <span>{isTesting ? 'Probando...' : 'Probar'}</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* Selector de Modelo */}
-                      <div className="lg:col-span-3 space-y-1">
-                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
-                          Modelo Asignado:
-                        </label>
-                        <select
-                          value={config?.model || info.models[0]?.id}
-                          onChange={(e) => handleModelChange(providerKey, e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-400 font-mono"
-                        >
-                          {info.models.map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                      {/* DIAGNÓSTICO ENRIQUECIDO (TOKENS, TIER, LÍMITES Y SALDO) */}
+                      {testResult && (
+                        <div className={`p-3.5 rounded-xl border text-xs space-y-2 animate-in fade-in ${
+                          testResult.success
+                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                            : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                        }`}>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-bold flex items-center gap-1.5">
+                              {testResult.message}
+                            </span>
+                            {testResult.latencyMs > 0 && (
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/50 border border-white/10 shrink-0 text-white">
+                                ⚡ {testResult.latencyMs} ms
+                              </span>
+                            )}
+                          </div>
 
-                      {/* Botón de Probar Conexión */}
-                      <div className="lg:col-span-2 flex items-end">
-                        <button
-                          type="button"
-                          disabled={isTesting}
-                          onClick={() => handleTestProvider(providerKey)}
-                          className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                            isConfigured
-                              ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
-                              : 'bg-slate-900 text-slate-500 border border-slate-800'
-                          } disabled:opacity-50`}
-                        >
-                          <RotateCcw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin text-amber-400' : ''}`} />
-                          <span>{isTesting ? 'Probando...' : 'Probar'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Diagnóstico del Test de Conexión en Tiempo Real */}
-                    {testResult && (
-                      <div className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-3 animate-in fade-in ${
-                        testResult.success
-                          ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
-                          : 'bg-rose-950/60 border-rose-500/40 text-rose-200'
-                      }`}>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold">{testResult.message}</span>
+                          {testResult.quotaInfo && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-2 border-t border-emerald-500/20 text-[11px] font-mono">
+                              {testResult.quotaInfo.tier && (
+                                <div className="bg-black/30 p-2 rounded-lg border border-emerald-500/20">
+                                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Nivel / Tier:</span>
+                                  <span className="text-white font-bold">{testResult.quotaInfo.tier}</span>
+                                </div>
+                              )}
+                              {testResult.quotaInfo.tokensPerMinute && (
+                                <div className="bg-black/30 p-2 rounded-lg border border-emerald-500/20">
+                                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Límite por Minuto (TPM):</span>
+                                  <span className="text-teal-300 font-bold">{testResult.quotaInfo.tokensPerMinute}</span>
+                                </div>
+                              )}
+                              {testResult.quotaInfo.remainingCredits && (
+                                <div className="bg-black/30 p-2 rounded-lg border border-emerald-500/20">
+                                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Saldo / Créditos Restantes:</span>
+                                  <span className="text-amber-300 font-bold">{testResult.quotaInfo.remainingCredits}</span>
+                                </div>
+                              )}
+                              {testResult.quotaInfo.estimatedDailyTokens && (
+                                <div className="bg-black/30 p-2 rounded-lg border border-emerald-500/20 sm:col-span-2 md:col-span-3">
+                                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Capacidad & Rendimiento Estimado:</span>
+                                  <span className="text-emerald-300">{testResult.quotaInfo.estimatedDailyTokens}</span>
+                                  {testResult.quotaInfo.details && (
+                                    <span className="text-slate-400 text-[10px] block mt-0.5">{testResult.quotaInfo.details}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        {testResult.latencyMs > 0 && (
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/40 border border-white/10 shrink-0">
-                            ⚡ {testResult.latencyMs} ms
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Barra Inferior de Guardado */}
-            <div className="p-4 rounded-2xl bg-[#080d16] border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <span className="text-xs text-slate-400">
-                Las claves se aplican de inmediato en los motores de generación de historias, glosarios SRS y audio.
-              </span>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={handleSaveAiSettings}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Guardar Toda la Configuración</span>
-                </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
 
-          </div>
-        )}
+              {/* Barra Inferior de Guardado */}
+              <div className="p-4 rounded-2xl bg-[#080d16] border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span className="text-xs text-slate-400">
+                  Las claves y configuraciones se aplican de inmediato en toda la plataforma Nativa.
+                </span>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleTestAllProviders}
+                    disabled={isBatchTesting}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-white transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isBatchTesting ? 'animate-spin' : ''}`} />
+                    <span>Re-testear Todas</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveAiSettings}
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Guardar Toda la Configuración</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
       </main>
 
       {/* =====================================================================
