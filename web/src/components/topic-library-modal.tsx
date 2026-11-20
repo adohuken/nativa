@@ -25,8 +25,12 @@ import {
   Info,
   Database,
   Globe,
-  Sliders
+  Sliders,
+  Play,
+  Pause,
+  Square
 } from 'lucide-react';
+import { karaokeTTS, KaraokeWordPosition } from '@/lib/karaoke-tts';
 import {
   ExtraContentItem,
   ExtraContentType,
@@ -76,9 +80,11 @@ export function TopicLibraryModal({
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<{ message: string; isCache: boolean } | null>(null);
 
-  // Estados del reproductor de lectura/audio
+  // Estados del reproductor de lectura/audio Karaoke
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [audioSpeed, setAudioSpeed] = useState<number>(1.0);
+  const [isAudioPaused, setIsAudioPaused] = useState(false);
+  const [audioSpeed, setAudioSpeed] = useState<number>(0.95);
+  const [karaokeWord, setKaraokeWord] = useState<KaraokeWordPosition | null>(null);
   const [selectedWord, setSelectedWord] = useState<{ word: string; def: string } | null>(null);
   const [completionNotice, setCompletionNotice] = useState<string | null>(null);
 
@@ -169,15 +175,39 @@ export function TopicLibraryModal({
   const toggleFullNarration = () => {
     if (!selectedItem) return;
     if (isPlayingAudio) {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+      if (isAudioPaused) {
+        karaokeTTS.resume();
+        setIsAudioPaused(false);
+        soundManager.playClick();
+      } else {
+        karaokeTTS.pause();
+        setIsAudioPaused(true);
+        soundManager.playClick();
       }
-      setIsPlayingAudio(false);
     } else {
       setIsPlayingAudio(true);
-      const textToPlay = selectedItem.paragraphs.join(' ');
-      speakText(textToPlay);
+      setIsAudioPaused(false);
+      soundManager.playClick();
+      const userProfile = AppStorage.getUserProfile();
+      karaokeTTS.play(selectedItem.paragraphs, {
+        rate: audioSpeed,
+        accent: userProfile?.accentPreference || 'uk',
+        onWord: (pos) => setKaraokeWord(pos),
+        onEnd: () => {
+          setIsPlayingAudio(false);
+          setIsAudioPaused(false);
+          setKaraokeWord(null);
+        }
+      });
     }
+  };
+
+  const stopNarration = () => {
+    karaokeTTS.stop();
+    setIsPlayingAudio(false);
+    setIsAudioPaused(false);
+    setKaraokeWord(null);
+    soundManager.playClick();
   };
 
   // =========================================================================
@@ -510,19 +540,65 @@ export function TopicLibraryModal({
                     </span>
                   </div>
 
-                  {/* Controles de Reproducción de Voz */}
+                  {/* Controles de Reproducción de Voz Karaoke */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={toggleFullNarration}
                       className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                        isPlayingAudio
-                          ? 'bg-rose-950/60 border-rose-500/40 text-rose-300 animate-pulse'
+                        isPlayingAudio && !isAudioPaused
+                          ? 'bg-emerald-950/70 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30'
+                          : isAudioPaused
+                          ? 'bg-amber-950/70 border-amber-500 text-amber-300'
                           : 'bg-[#0e1626] border-slate-700 text-slate-200 hover:border-emerald-500/40 hover:text-emerald-300'
                       }`}
                     >
-                      {isPlayingAudio ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-emerald-400" />}
-                      <span>{isPlayingAudio ? 'Detener Audio' : 'Escuchar Narración'}</span>
+                      {isPlayingAudio && !isAudioPaused ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5 fill-current" />
+                          <span>Pausar</span>
+                        </>
+                      ) : isAudioPaused ? (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Reanudar</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 text-emerald-400 fill-current" />
+                          <span>Escuchar (Play)</span>
+                        </>
+                      )}
                     </button>
+
+                    {isPlayingAudio && (
+                      <button
+                        onClick={stopNarration}
+                        className="p-1.5 rounded-xl bg-slate-900 hover:bg-rose-950/50 border border-slate-800 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                        title="Detener Audio"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    )}
+
+                    {/* Selector de Velocidad */}
+                    <div className="flex items-center bg-slate-900 rounded-xl p-0.5 border border-slate-800 text-[10px] font-mono">
+                      {[0.8, 0.95, 1.2].map(speed => (
+                        <button
+                          key={speed}
+                          onClick={() => {
+                            setAudioSpeed(speed);
+                            if (isPlayingAudio) stopNarration();
+                          }}
+                          className={`px-2 py-0.5 rounded-lg font-bold transition cursor-pointer ${
+                            audioSpeed === speed 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {speed}x
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -553,10 +629,10 @@ export function TopicLibraryModal({
                   <span>Haz clic en cualquier palabra para escuchar su fonética nativa y ver su significado.</span>
                 </div>
 
-                {/* PÁRRAFOS DEL TEXTO CON CLICK-TO-DEFINE */}
+                {/* PÁRRAFOS DEL TEXTO CON CLICK-TO-DEFINE Y KARAOKE */}
                 <div className="space-y-4 font-sans leading-relaxed text-base md:text-lg text-slate-200 selection:bg-emerald-500/30">
                   {selectedItem.paragraphs.map((paragraph, pIdx) => {
-                    const words = paragraph.split(' ');
+                    const words = paragraph.split(/\s+/).filter(Boolean);
                     return (
                       <p key={pIdx} className="p-4 rounded-2xl bg-[#090d16]/70 border border-slate-800/40 hover:border-slate-700/60 transition">
                         {words.map((w, wIdx) => {
@@ -567,6 +643,8 @@ export function TopicLibraryModal({
                             return k.toLowerCase() === clean || parts.includes(clean);
                           });
 
+                          const isKaraokeActive = isPlayingAudio && karaokeWord?.paragraphIndex === pIdx && karaokeWord?.wordIndex === wIdx;
+
                           return (
                             <span
                               key={wIdx}
@@ -575,8 +653,10 @@ export function TopicLibraryModal({
                                 setSelectedWord({ word: clean, def });
                                 speakText(clean);
                               }}
-                              className={`cursor-pointer transition duration-150 inline-block px-0.5 rounded ${
-                                isVocab
+                              className={`cursor-pointer transition-all duration-150 inline-block px-1 py-0.5 rounded ${
+                                isKaraokeActive
+                                  ? 'bg-gradient-to-r from-emerald-400 to-teal-300 text-slate-950 font-black shadow-lg shadow-emerald-500/50 scale-110 ring-2 ring-emerald-300 z-10'
+                                  : isVocab
                                   ? 'text-teal-300 font-semibold underline decoration-teal-500/50 decoration-2 underline-offset-4 hover:bg-teal-950/60 hover:text-white'
                                   : 'hover:text-emerald-300 hover:bg-slate-800/70'
                               }`}

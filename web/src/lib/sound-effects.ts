@@ -144,6 +144,14 @@ class SoundSynthesizer {
       });
     } catch {}
   }
+
+  public playLevelUp(): void {
+    this.playVictory();
+  }
+
+  public playWrong(): void {
+    this.playGentleError();
+  }
 }
 
 export const soundManager = new SoundSynthesizer();

@@ -31,8 +31,11 @@ import { LANGUAGES_REGISTRY, LanguageHubEntry, getAllLanguages } from '@/content
 import { AppStorage, UserProfile } from '@/lib/storage';
 import { soundManager } from '@/lib/sound-effects';
 import { UserProfileModal } from '@/components/user-profile-modal';
+import { AuthModal } from '@/components/auth-modal';
+import { PlacementTestModal } from '@/components/placement-test-modal';
 import { DailyMissionsWidget } from '@/components/daily-missions-widget';
 import { APP_NAME } from '@/lib/config';
+import { isSupabaseConfigured, getSupabaseClient } from '@/lib/supabase';
 
 export default function FluentiaDashboardPage() {
   const [streakDays, setStreakDays] = useState<number>(2);
@@ -43,8 +46,10 @@ export default function FluentiaDashboardPage() {
   const [activeLang, setActiveLang] = useState<string>('english');
   const [languages, setLanguages] = useState<Record<string, LanguageHubEntry>>(LANGUAGES_REGISTRY);
 
-  // Perfil de Usuario
+  // Perfil de Usuario y Autenticación Supabase
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isPlacementTestOpen, setIsPlacementTestOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
 
   useEffect(() => {
@@ -66,6 +71,21 @@ export default function FluentiaDashboardPage() {
     setLanguages(allLangs);
     setUserProfile(profile);
     soundManager.enabled = savedSound;
+
+    // Hidratar desde Supabase si la sesión está activa
+    const client = getSupabaseClient();
+    if (client && isSupabaseConfigured) {
+      client.auth.getSession().then(async ({ data: { session } }) => {
+        if (session?.user) {
+          await AppStorage.syncFromSupabase(session.user.id);
+          setUserProfile(AppStorage.getUserProfile());
+          setStreakDays(AppStorage.getStreak('english'));
+          setUserXp(AppStorage.getXp('english'));
+          setImmersionMinutes(AppStorage.getImmersionMinutes('english'));
+          setCompletedEnglishNodes(AppStorage.getCompletedNodes('english'));
+        }
+      });
+    }
   }, []);
 
   const toggleSound = () => {
@@ -121,6 +141,19 @@ export default function FluentiaDashboardPage() {
             className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-emerald-300 flex items-center justify-center transition"
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+          </button>
+
+          {/* Botón de Acceso / Supabase Auth */}
+          <button
+            onClick={() => {
+              setIsAuthModalOpen(true);
+              soundManager.playClick();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-bold transition shadow-sm"
+            title="Conectar con Supabase o Iniciar Sesión"
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className="hidden sm:inline">Cuenta</span>
           </button>
 
           {/* Botón de Perfil de Usuario con Foto / Avatar */}
@@ -566,6 +599,36 @@ export default function FluentiaDashboardPage() {
         streakDays={streakDays}
         userXp={userXp}
         immersionMinutes={immersionMinutes}
+      />
+
+      {/* Modal de Autenticación Supabase (Email y Google OAuth) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={async (profile) => {
+          await AppStorage.syncFromSupabase(profile.id);
+          setUserProfile(AppStorage.getUserProfile());
+          setStreakDays(AppStorage.getStreak('english'));
+          setUserXp(AppStorage.getXp('english'));
+          setImmersionMinutes(AppStorage.getImmersionMinutes('english'));
+          setCompletedEnglishNodes(AppStorage.getCompletedNodes('english'));
+          if (typeof window !== 'undefined' && localStorage.getItem('nativa_should_show_placement') === 'true') {
+            localStorage.removeItem('nativa_should_show_placement');
+            setIsPlacementTestOpen(true);
+          }
+        }}
+      />
+
+      {/* Modal del Test de Nivelación Adaptativo */}
+      <PlacementTestModal
+        isOpen={isPlacementTestOpen}
+        onClose={() => setIsPlacementTestOpen(false)}
+        userId={userProfile.id}
+        onLevelAssigned={(level, unlockedNodes) => {
+          setCompletedEnglishNodes(unlockedNodes);
+          setUserProfile(AppStorage.getUserProfile());
+          setUserXp(AppStorage.getXp('english'));
+        }}
       />
 
     </div>

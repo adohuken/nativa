@@ -26,6 +26,8 @@ export interface ProjectSubmission {
     grammaticalAccuracy: number; // 0 - 25
   };
   feedback: string;
+  tips?: string[];
+  providerUsed?: string;
 }
 
 export interface StarredPhrase {
@@ -58,6 +60,28 @@ export interface DailyMissionsState {
   allCompletedBonusClaimed: boolean;
 }
 
+export interface PaymentRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  referenceNumber: string;
+  bankName: string;
+  amount: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  notes?: string;
+}
+
+export interface LicenseCode {
+  code: string;
+  maxRedemptions: number;
+  currentRedemptions: number;
+  active: boolean;
+  createdAt: string;
+  note?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -73,7 +97,7 @@ export interface UserProfile {
   learningFocus: string;
   bio: string;
   createdAt: string;
-  accentPreference: 'uk' | 'us';
+  accentPreference: 'uk' | 'us' | 'au';
   preferredStudyTime: 'morning' | 'afternoon' | 'night';
   interfaceLanguage: 'es' | 'en';
 }
@@ -117,6 +141,10 @@ const KEYS = {
   DAILY_MISSIONS: 'fluentia_daily_missions',
   CUSTOM_LIBRARY_ITEMS: 'fluentia_custom_library_items',
   COMPLETED_LIBRARY_ITEMS: 'fluentia_completed_library_items',
+  PAYWALL_ENABLED: 'fluentia_paywall_enabled',
+  IS_PREMIUM: 'fluentia_is_premium',
+  PAYMENT_REQUESTS: 'fluentia_payment_requests',
+  LICENSE_CODES: 'fluentia_license_codes',
 };
 
 function getLangKey(baseKey: string, lang: string = 'english'): string {
@@ -620,5 +648,318 @@ export const AppStorage = {
       localStorage.removeItem(KEYS.SKILLS);
       localStorage.removeItem(KEYS.PROJECTS);
     } catch {}
+  },
+
+  // =========================================================================
+  // SINCRONIZACIÓN EN LA NUBE (SUPABASE SYNC LAYER)
+  // =========================================================================
+  async syncFromSupabase(userId: string): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    try {
+      const { getSupabaseClient, isSupabaseConfigured } = await import('@/lib/supabase');
+      const client = getSupabaseClient();
+      if (!client || !isSupabaseConfigured) return false;
+
+      // 1. Cargar Perfil
+      const { data: profile } = await client
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profile) {
+        if (profile.xp !== undefined) this.saveXp(profile.xp);
+        if (profile.streak !== undefined) this.saveStreak(profile.streak);
+        if (profile.is_premium !== undefined) this.setUserPremium(Boolean(profile.is_premium));
+        const currentProfile = this.getUserProfile();
+        this.saveUserProfile({
+          ...currentProfile,
+          id: profile.id,
+          email: profile.email || currentProfile.email,
+          name: profile.name || currentProfile.name,
+          targetLevel: profile.current_level || currentProfile.targetLevel
+        });
+      }
+
+      // 2. Cargar Progreso de Nodos
+      const { data: progress } = await client
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (progress) {
+        if (Array.isArray(progress.completed_nodes)) {
+          this.saveCompletedNodes(progress.completed_nodes);
+        }
+        if (Array.isArray(progress.completed_subnodes)) {
+          this.saveCompletedSubNodes(progress.completed_subnodes);
+        }
+        if (progress.immersion_minutes !== undefined) {
+          localStorage.setItem(KEYS.IMMERSION_MINUTES, progress.immersion_minutes.toString());
+        }
+        if (progress.skills) {
+          this.saveSkillScores(progress.skills);
+        }
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Error syncing from Supabase:', err);
+      return false;
+    }
+  },
+
+  async syncToSupabase(userId: string): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    try {
+      const { getSupabaseClient, isSupabaseConfigured } = await import('@/lib/supabase');
+      const client = getSupabaseClient();
+      if (!client || !isSupabaseConfigured) return false;
+
+      const profile = this.getUserProfile();
+      const xp = this.getXp();
+      const streak = this.getStreak();
+      const completedNodes = this.getCompletedNodes();
+      const completedSubNodes = this.getCompletedSubNodes();
+      const immersionMinutes = this.getImmersionMinutes();
+      const skills = this.getSkillScores();
+
+      // Upsert perfil
+      await client.from('profiles').upsert({
+        id: userId,
+        email: profile.email,
+        name: profile.name,
+        xp,
+        streak,
+        is_premium: this.isUserPremium(),
+        updated_at: new Date().toISOString()
+      });
+
+      // Upsert progreso
+      await client.from('user_progress').upsert({
+        user_id: userId,
+        completed_nodes: completedNodes,
+        completed_subnodes: completedSubNodes,
+        immersion_minutes: immersionMinutes,
+        skills,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
+      return true;
+    } catch (err) {
+      console.error('Error syncing to Supabase:', err);
+      return false;
+    }
+  },
+
+  // =========================================================================
+  // FASE 5: PAYWALL MANUAL, ESTADO PREMIUM Y CÓDIGOS DE LICENCIA B2B
+  // =========================================================================
+  getPaywallEnabled(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const data = localStorage.getItem(KEYS.PAYWALL_ENABLED);
+      return data === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  setPaywallEnabled(enabled: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(KEYS.PAYWALL_ENABLED, enabled ? 'true' : 'false');
+    } catch {}
+  },
+
+  isUserPremium(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const data = localStorage.getItem(KEYS.IS_PREMIUM);
+      return data === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  setUserPremium(isPremium: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(KEYS.IS_PREMIUM, isPremium ? 'true' : 'false');
+    } catch {}
+  },
+
+  getPaymentRequests(): PaymentRequest[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem(KEYS.PAYMENT_REQUESTS);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  },
+
+  savePaymentRequests(requests: PaymentRequest[]): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(KEYS.PAYMENT_REQUESTS, JSON.stringify(requests));
+    } catch {}
+  },
+
+  submitPaymentRequest(req: {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    referenceNumber: string;
+    bankName?: string;
+    amount?: string;
+    notes?: string;
+  }): PaymentRequest {
+    const list = this.getPaymentRequests();
+    const newReq: PaymentRequest = {
+      id: `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      userId: req.userId || 'usr_anonymous',
+      userName: req.userName || 'Estudiante Nativa',
+      userEmail: req.userEmail || '',
+      referenceNumber: req.referenceNumber.trim(),
+      bankName: req.bankName || 'BANPRO (Nicaragua)',
+      amount: req.amount || '$29.99 USD / C$ 1,095',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      notes: req.notes
+    };
+    const updated = [newReq, ...list];
+    this.savePaymentRequests(updated);
+    return newReq;
+  },
+
+  approvePaymentRequest(requestId: string): boolean {
+    const list = this.getPaymentRequests();
+    let found = false;
+    const updated = list.map(item => {
+      if (item.id === requestId) {
+        found = true;
+        return { ...item, status: 'approved' as const };
+      }
+      return item;
+    });
+    if (found) {
+      this.savePaymentRequests(updated);
+      this.setUserPremium(true);
+    }
+    return found;
+  },
+
+  rejectPaymentRequest(requestId: string): boolean {
+    const list = this.getPaymentRequests();
+    let found = false;
+    const updated = list.map(item => {
+      if (item.id === requestId) {
+        found = true;
+        return { ...item, status: 'rejected' as const };
+      }
+      return item;
+    });
+    if (found) {
+      this.savePaymentRequests(updated);
+    }
+    return found;
+  },
+
+  getLicenseCodes(): LicenseCode[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem(KEYS.LICENSE_CODES);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          // Excluir códigos ficticios demo
+          const cleaned = parsed.filter(c =>
+            c.code !== 'NATIVA-VIP-ACCESS' &&
+            c.code !== 'NATIVA-CALL-2026' &&
+            c.code !== 'NATIVA-UNI-SCHOLAR' &&
+            !c.note?.includes('Convenio Call Center BPO Excellence') &&
+            !c.note?.includes('Beca Académica Universitaria UNI / UCA') &&
+            !c.note?.includes('Acceso Especial Fundadores')
+          );
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem(KEYS.LICENSE_CODES, JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
+      }
+    } catch {}
+    return [];
+  },
+
+  saveLicenseCodes(codes: LicenseCode[]): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(KEYS.LICENSE_CODES, JSON.stringify(codes));
+    } catch {}
+  },
+
+  generateLicenseCode(code: string, note?: string, maxRedemptions: number = 100): LicenseCode {
+    const cleanCode = code.trim().toUpperCase();
+    const codes = this.getLicenseCodes();
+    const existing = codes.find(c => c.code === cleanCode);
+    if (existing) {
+      return existing;
+    }
+    const newCode: LicenseCode = {
+      code: cleanCode,
+      maxRedemptions,
+      currentRedemptions: 0,
+      active: true,
+      createdAt: new Date().toISOString().split('T')[0],
+      note: note || 'Licencia Corporativa B2B'
+    };
+    this.saveLicenseCodes([newCode, ...codes]);
+    return newCode;
+  },
+
+  toggleLicenseCode(code: string): boolean {
+    const codes = this.getLicenseCodes();
+    const updated = codes.map(c => c.code === code ? { ...c, active: !c.active } : c);
+    this.saveLicenseCodes(updated);
+    return true;
+  },
+
+  redeemLicenseCode(rawCode: string): { success: boolean; message: string } {
+    const cleanCode = rawCode.trim().toUpperCase();
+    if (!cleanCode) {
+      return { success: false, message: 'Ingresa un código de licencia válido.' };
+    }
+    const codes = this.getLicenseCodes();
+    const found = codes.find(c => c.code === cleanCode);
+    if (!found) {
+      return { success: false, message: 'Código de licencia no encontrado o inválido.' };
+    }
+    if (!found.active) {
+      return { success: false, message: 'Este código de licencia se encuentra desactivado.' };
+    }
+    if (found.currentRedemptions >= found.maxRedemptions) {
+      return { success: false, message: 'Este código de licencia ha alcanzado el límite máximo de activaciones.' };
+    }
+
+    // Incrementar redención
+    const updated = codes.map(c => {
+      if (c.code === cleanCode) {
+        return { ...c, currentRedemptions: c.currentRedemptions + 1 };
+      }
+      return c;
+    });
+    this.saveLicenseCodes(updated);
+
+    // Activar Premium para el usuario
+    this.setUserPremium(true);
+
+    return { 
+      success: true, 
+      message: `¡Licencia activada con éxito! Has desbloqueado Nativa Premium (${found.note || cleanCode}).` 
+    };
   }
 };

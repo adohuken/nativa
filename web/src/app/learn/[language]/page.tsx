@@ -60,7 +60,13 @@ import {
   Briefcase,
   CreditCard,
   Coffee,
-  ArrowLeft
+  ArrowLeft,
+  Lightbulb,
+  Bold,
+  Italic,
+  List,
+  Quote,
+  Crown
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -80,7 +86,12 @@ import { TopicLibraryModal } from '@/components/topic-library-modal';
 import { DailyMissionsWidget } from '@/components/daily-missions-widget';
 import { RadarSkillsChart } from '@/components/radar-skills-chart';
 import { UserProfileModal } from '@/components/user-profile-modal';
+import { PlacementTestModal } from '@/components/placement-test-modal';
+import { PremiumPaywallModal } from '@/components/premium-paywall-modal';
+import { CertificatesModal } from '@/components/certificates-modal';
 import { APP_NAME } from '@/lib/config';
+import { getSupabaseClient, isSupabaseConfigured, DatabaseProfile } from '@/lib/supabase';
+import { AiConfigService } from '@/lib/ai-config';
 
 interface BuilderToken {
   id: string;
@@ -259,9 +270,19 @@ function FluentiaPathContent() {
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [fullNameInput, setFullNameInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authSuccessMessage, setAuthSuccessMessage] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isPlacementTestOpen, setIsPlacementTestOpen] = useState(false);
+  const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
+  const [paywallReason, setPaywallReason] = useState<string>('');
+  const [isCertificatesModalOpen, setIsCertificatesModalOpen] = useState(false);
+  const [b2c2AlertModalOpen, setB2c2AlertModalOpen] = useState(false);
+  const [b2c2AlertLevel, setB2c2AlertLevel] = useState('B2');
+  const [isUserPremium, setIsUserPremium] = useState<boolean>(() => AppStorage.isUserPremium());
+  const [isPaywallActive, setIsPaywallActive] = useState<boolean>(() => AppStorage.getPaywallEnabled());
   const [userProfile, setUserProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
 
   // Navegación de Vistas del Dashboard: 'PATH' | 'IMMERSION' | 'SYLLABUS' | 'PROJECTS' | 'REVIEW'
@@ -349,47 +370,89 @@ function FluentiaPathContent() {
   const [step6SelectedIdx, setStep6SelectedIdx] = useState<number | null>(null);
   const [lessonFinished, setLessonFinished] = useState(false);
 
-  // Hidratar progreso desde localStorage al montar
+  // Sincronización en la nube con Supabase
+  const triggerCloudSync = (targetUser?: UserSession | null) => {
+    const active = targetUser !== undefined ? targetUser : user;
+    if (active?.id) {
+      AppStorage.syncToSupabase(active.id).catch(err => {
+        console.error('Error syncing to Supabase:', err);
+      });
+    }
+  };
+
+  // Hidratar progreso desde Supabase y localStorage al montar
   useEffect(() => {
-    // 1. Cargar sesión de usuario
+    // 1. Cargar progreso base desde AppStorage
+    const hydrateLocalState = () => {
+      setCompletedNodeIds(AppStorage.getCompletedNodes());
+      setUserXp(AppStorage.getXp());
+      setStreakDays(AppStorage.getStreak());
+      setSkillScores(AppStorage.getSkillScores());
+      setSoundEnabled(AppStorage.getSoundEnabled());
+      soundManager.enabled = AppStorage.getSoundEnabled();
+      setZenMode(AppStorage.getZenMode());
+      setProjectSubmissions(AppStorage.getProjectSubmissions());
+      setImmersionMinutes(AppStorage.getImmersionMinutes());
+      setStarredPhrases(AppStorage.getStarredPhrases());
+      setCompletedSubNodeIds(AppStorage.getCompletedSubNodes());
+      setUserProfile(AppStorage.getUserProfile());
+    };
+
+    hydrateLocalState();
+
+    // 4. Mostrar Test de Nivelación si acaba de registrarse
+    try {
+      if (localStorage.getItem('nativa_should_show_placement') === 'true') {
+        localStorage.removeItem('nativa_should_show_placement');
+        setIsPlacementTestOpen(true);
+      }
+    } catch {}
     const savedUser = localStorage.getItem('fluentia_user_session');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
       } catch { }
     }
 
-    // 2. Hidratar progreso desde AppStorage
-    const savedNodes = AppStorage.getCompletedNodes();
-    setCompletedNodeIds(savedNodes);
+    // 3. Conexión en vivo con Supabase Auth (si está configurado)
+    const client = getSupabaseClient();
+    if (client && isSupabaseConfigured) {
+      client.auth.getSession().then(async ({ data: { session } }) => {
+        if (session?.user) {
+          const cloudSession: UserSession = {
+            id: session.user.id,
+            email: session.user.email || '',
+            role: 'STUDENT',
+          };
+          setUser(cloudSession);
+          localStorage.setItem('fluentia_user_session', JSON.stringify(cloudSession));
+          await AppStorage.syncFromSupabase(session.user.id);
+          hydrateLocalState();
+        }
+      });
 
-    const savedXp = AppStorage.getXp();
-    setUserXp(savedXp);
+      const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          const cloudSession: UserSession = {
+            id: session.user.id,
+            email: session.user.email || '',
+            role: 'STUDENT',
+          };
+          setUser(cloudSession);
+          localStorage.setItem('fluentia_user_session', JSON.stringify(cloudSession));
+          await AppStorage.syncFromSupabase(session.user.id);
+          hydrateLocalState();
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          localStorage.removeItem('fluentia_user_session');
+        }
+      });
 
-    const savedStreak = AppStorage.getStreak();
-    setStreakDays(savedStreak);
-
-    const savedSkills = AppStorage.getSkillScores();
-    setSkillScores(savedSkills);
-
-    const savedSound = AppStorage.getSoundEnabled();
-    setSoundEnabled(savedSound);
-    soundManager.enabled = savedSound;
-
-    const savedZen = AppStorage.getZenMode();
-    setZenMode(savedZen);
-
-    const savedSubmissions = AppStorage.getProjectSubmissions();
-    setProjectSubmissions(savedSubmissions);
-
-    const savedImmersion = AppStorage.getImmersionMinutes();
-    setImmersionMinutes(savedImmersion);
-
-    const savedStarred = AppStorage.getStarredPhrases();
-    setStarredPhrases(savedStarred);
-
-    const savedSubNodes = AppStorage.getCompletedSubNodes();
-    setCompletedSubNodeIds(savedSubNodes);
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, []);
 
   const handleCompleteSubNode = (subNodeId: string, xpReward: number) => {
@@ -405,6 +468,7 @@ function FluentiaPathContent() {
 
     setActiveSubNode(null);
     soundManager.playVictory();
+    triggerCloudSync();
   };
 
   const toggleSound = () => {
@@ -445,44 +509,132 @@ function FluentiaPathContent() {
     AppStorage.saveXp(nextXp);
     soundManager.playVictory();
     setSelectedImmersionStory(null);
+    triggerCloudSync();
   };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
+    setAuthSuccessMessage(null);
     setAuthLoading(true);
+    soundManager.playClick();
 
-    const endpoint = authMode === 'LOGIN' ? 'http://localhost:4000/auth/login' : 'http://localhost:4000/auth/register';
-    const payload = authMode === 'LOGIN'
-      ? { email: emailInput, password: passwordInput }
-      : { email: emailInput, password: passwordInput, nativeLanguageCode: 'es', targetLanguageCode: 'en' };
+    const client = getSupabaseClient();
+
+    // MODO LOCAL / DEMO SI SUPABASE AÚN NO TIENE CREDENCIALES
+    if (!client || !isSupabaseConfigured) {
+      setTimeout(() => {
+        const fallbackUser: UserSession = {
+          id: 'user-' + Date.now(),
+          email: emailInput || `estudiante@${APP_NAME.toLowerCase()}.io`,
+          role: 'STUDENT',
+        };
+        setUser(fallbackUser);
+        localStorage.setItem('fluentia_user_session', JSON.stringify(fallbackUser));
+        
+        AppStorage.saveUserProfile({
+          ...AppStorage.getUserProfile(),
+          name: fullNameInput.trim() || emailInput.split('@')[0] || 'Estudiante Nativa',
+          email: fallbackUser.email
+        });
+        
+        soundManager.playVictory();
+        setAuthLoading(false);
+        if (authMode === 'REGISTER') {
+          setIsPlacementTestOpen(true);
+        }
+      }, 500);
+      return;
+    }
 
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      if (authMode === 'REGISTER') {
+        const { data, error } = await client.auth.signUp({
+          email: emailInput.trim(),
+          password: passwordInput.trim(),
+          options: {
+            data: {
+              full_name: fullNameInput.trim() || emailInput.split('@')[0]
+            }
+          }
+        });
 
-      const data = await res.json();
+        if (error) throw error;
 
-      if (res.ok && data.user) {
-        setUser(data.user);
-        localStorage.setItem('fluentia_user_session', JSON.stringify(data.user));
+        if (data.user) {
+          const userSession: UserSession = {
+            id: data.user.id,
+            email: data.user.email || emailInput,
+            role: 'STUDENT'
+          };
+          setUser(userSession);
+          localStorage.setItem('fluentia_user_session', JSON.stringify(userSession));
+          await AppStorage.syncToSupabase(data.user.id);
+          soundManager.playVictory();
+          setAuthSuccessMessage('✓ Cuenta creada exitosamente. Bienvenido a Nativa.');
+          setIsPlacementTestOpen(true);
+        } else {
+          setAuthSuccessMessage('✓ Revisa tu correo electrónico para confirmar tu cuenta.');
+        }
       } else {
-        setAuthError(data.message || 'Error en las credenciales.');
+        const { data, error } = await client.auth.signInWithPassword({
+          email: emailInput.trim(),
+          password: passwordInput.trim()
+        });
+
+        if (error) throw error;
+
+        if (data.user) {
+          const userSession: UserSession = {
+            id: data.user.id,
+            email: data.user.email || emailInput,
+            role: 'STUDENT'
+          };
+          setUser(userSession);
+          localStorage.setItem('fluentia_user_session', JSON.stringify(userSession));
+          await AppStorage.syncFromSupabase(data.user.id);
+          // Actualizar estados
+          setCompletedNodeIds(AppStorage.getCompletedNodes());
+          setCompletedSubNodeIds(AppStorage.getCompletedSubNodes());
+          setUserXp(AppStorage.getXp());
+          setStreakDays(AppStorage.getStreak());
+          setSkillScores(AppStorage.getSkillScores());
+          setImmersionMinutes(AppStorage.getImmersionMinutes());
+          soundManager.playVictory();
+        }
       }
-    } catch {
-      // Fallback local elegante
-      const fallbackUser: UserSession = {
-        id: 'user-' + Date.now(),
-        email: emailInput || `estudiante@${APP_NAME.toLowerCase()}.io`,
-        role: 'STUDENT',
-      };
-      setUser(fallbackUser);
-      localStorage.setItem('fluentia_user_session', JSON.stringify(fallbackUser));
+    } catch (err: any) {
+      soundManager.playGentleError();
+      setAuthError(err?.message || 'Error al conectar con el servidor de autenticación.');
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setAuthError(null);
+    soundManager.playClick();
+    const client = getSupabaseClient();
+
+    if (!client || !isSupabaseConfigured) {
+      setAuthError('Configura NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en web/.env.local para usar Google OAuth.');
+      soundManager.playGentleError();
+      return;
+    }
+
+    try {
+      setAuthLoading(true);
+      const { error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined
+        }
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setAuthLoading(false);
+      soundManager.playGentleError();
+      setAuthError(err?.message || 'Error al iniciar sesión con Google.');
     }
   };
 
@@ -494,11 +646,19 @@ function FluentiaPathContent() {
     };
     setUser(guestUser);
     localStorage.setItem('fluentia_user_session', JSON.stringify(guestUser));
+    soundManager.playClick();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const client = getSupabaseClient();
+      if (client && isSupabaseConfigured) {
+        await client.auth.signOut();
+      }
+    } catch { }
     setUser(null);
     localStorage.removeItem('fluentia_user_session');
+    soundManager.playClick();
   };
 
   const speakText = (text: string, lineIdx?: number, pitch: number = 1.0) => {
@@ -767,6 +927,23 @@ function FluentiaPathContent() {
   };
 
   const startLesson = (lesson: IntensiveLesson) => {
+    // Verificación de Paywall (Fase 5)
+    const isPaywallOn = AppStorage.getPaywallEnabled();
+    const isPremium = AppStorage.isUserPremium();
+    const isRestrictedLevel = ['B1', 'B2', 'C1', 'C2'].includes(lesson.level.toUpperCase());
+    const isCallCenterTrack = languageId === 'call-center' || languageId.includes('call-center');
+
+    if (isPaywallOn && !isPremium && (isRestrictedLevel || isCallCenterTrack)) {
+      setPaywallReason(
+        isCallCenterTrack 
+          ? 'El Track de Call Center BPO requiere una suscripción Nativa Premium activa.'
+          : `El nivel ${lesson.level} forma parte del plan Nativa Premium (B1 a C2).`
+      );
+      setIsPaywallModalOpen(true);
+      soundManager.playWrong();
+      return;
+    }
+
     setActiveLesson(lesson);
     setCurrentStep(1);
     setStep2SelectedIdx(null);
@@ -929,19 +1106,86 @@ function FluentiaPathContent() {
       newSkills.writing = Math.min(100, newSkills.writing + 3);
       setSkillScores(newSkills);
       AppStorage.saveSkillScores(newSkills);
+      triggerCloudSync();
     }
     soundManager.playVictory();
     setActiveLesson(null);
   };
 
-  const handleEvaluateProject = (project: AcademicProjectDefinition) => {
+  const handleEvaluateProject = async (project: AcademicProjectDefinition) => {
     const textToEvaluate = projectTextDraft || projectSubmissions[project.unit]?.content || '';
     if (!textToEvaluate.trim()) return;
 
     setIsEvaluatingProject(true);
     soundManager.playClick();
 
-    setTimeout(() => {
+    const aiSettings = AiConfigService.getSettings();
+    const primary = aiSettings.primaryProvider;
+    const activeKey = aiSettings.providers[primary]?.key || '';
+    const activeModel = aiSettings.providers[primary]?.model || '';
+
+    try {
+      const res = await fetch('/api/ai/evaluate-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project: {
+            unit: project.unit,
+            level: project.level,
+            title: project.title,
+            context: project.context,
+            instructions: project.instructions,
+            minWords: project.minWords,
+            maxWords: project.maxWords,
+            requiredKeywords: project.requiredKeywords,
+          },
+          studentText: textToEvaluate,
+          userId: user?.id,
+          aiProvider: primary,
+          apiKey: activeKey,
+          model: activeModel
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const submission: ProjectSubmission = {
+          unit: project.unit,
+          level: project.level,
+          title: project.title,
+          submittedAt: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }),
+          content: textToEvaluate,
+          overallScore: data.overallScore,
+          wordCount: data.wordCount,
+          rubricScores: data.rubricScores,
+          feedback: data.feedback,
+          tips: data.tips,
+          providerUsed: data.providerUsed
+        };
+
+        const updated = { ...projectSubmissions, [project.unit]: submission };
+        setProjectSubmissions(updated);
+        AppStorage.saveProjectSubmission(submission);
+
+        // Otorgar XP y habilidad de Writing
+        const nextXp = userXp + 100;
+        setUserXp(nextXp);
+        AppStorage.saveXp(nextXp);
+
+        const newSkills = { ...skillScores };
+        newSkills.writing = Math.min(100, newSkills.writing + 10);
+        setSkillScores(newSkills);
+        AppStorage.saveSkillScores(newSkills);
+        triggerCloudSync();
+
+        soundManager.playVictory();
+      } else {
+        throw new Error(data.message || 'Error en la respuesta del evaluador.');
+      }
+    } catch (err) {
+      console.error('Error evaluating project with AI:', err);
+      // Fallback heurístico inteligente si no hay red o faltan llaves
       const evaluation = evaluateProjectSubmission(project, textToEvaluate);
       const submission: ProjectSubmission = {
         unit: project.unit,
@@ -953,25 +1197,22 @@ function FluentiaPathContent() {
         wordCount: evaluation.wordCount,
         rubricScores: evaluation.rubricScores,
         feedback: evaluation.feedback,
+        tips: [
+          `1. Meta Comunicativa: Asegúrate de responder de forma exhaustiva a cada requerimiento de la tarea.`,
+          `2. Cohesión y Conectores: Incluye nexos discursivos formales como "Furthermore", "Nevertheless" o "Consequently".`,
+          `3. Léxico Específico: Incorpora más términos del vocabulario obligatorio de la unidad (${project.requiredKeywords.slice(0, 3).join(', ')}).`
+        ],
+        providerUsed: 'Evaluador Local TBLT'
       };
 
       const updated = { ...projectSubmissions, [project.unit]: submission };
       setProjectSubmissions(updated);
       AppStorage.saveProjectSubmission(submission);
-
-      // Otorgar XP y habilidad de Writing
-      const nextXp = userXp + 75;
-      setUserXp(nextXp);
-      AppStorage.saveXp(nextXp);
-
-      const newSkills = { ...skillScores };
-      newSkills.writing = Math.min(100, newSkills.writing + 8);
-      setSkillScores(newSkills);
-      AppStorage.saveSkillScores(newSkills);
-
-      setIsEvaluatingProject(false);
+      triggerCloudSync();
       soundManager.playVictory();
-    }, 1200);
+    } finally {
+      setIsEvaluatingProject(false);
+    }
   };
 
   const getNodeXOffset = (index: number) => {
@@ -1088,9 +1329,9 @@ function FluentiaPathContent() {
                   <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-extrabold">
                     Portal de Estudiantes
                   </span>
-                  <span className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-400">
-                    <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
-                    API Online
+                  <span className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full border ${isSupabaseConfigured ? 'text-emerald-300 bg-emerald-950/60 border-emerald-500/30' : 'text-amber-300 bg-amber-950/60 border-amber-500/30'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                    {isSupabaseConfigured ? 'Supabase Cloud' : 'Modo Demo Local'}
                   </span>
                 </div>
                 <h2 className="text-2xl font-black text-white tracking-tight">
@@ -1098,9 +1339,31 @@ function FluentiaPathContent() {
                 </h2>
                 <p className="text-xs text-neutral-400 leading-relaxed">
                   {authMode === 'LOGIN'
-                    ? 'Inicia sesión para sincronizar tu camino y racha de aprendizaje.'
-                    : 'Empieza desde el nivel A1 con progreso aislado en PostgreSQL.'}
+                    ? 'Inicia sesión para sincronizar tu camino y racha de aprendizaje en la nube.'
+                    : 'Regístrate para guardar tu progreso con Supabase PostgreSQL.'}
                 </p>
+              </div>
+
+              {/* Botón de Autenticación con Google */}
+              <button
+                type="button"
+                onClick={handleGoogleAuth}
+                disabled={authLoading}
+                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs transition shadow-md disabled:opacity-50 cursor-pointer"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>Continuar con Google</span>
+              </button>
+
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-neutral-800 w-full" />
+                <span className="bg-[#090d15] px-3 text-[10px] font-mono text-neutral-500 uppercase shrink-0">o con email</span>
+                <div className="border-t border-neutral-800 w-full" />
               </div>
 
               {/* Toggle Login / Register */}
@@ -1110,8 +1373,9 @@ function FluentiaPathContent() {
                   onClick={() => {
                     setAuthMode('LOGIN');
                     setAuthError(null);
+                    setAuthSuccessMessage(null);
                   }}
-                  className={`py-2.5 rounded-xl font-bold transition ${authMode === 'LOGIN'
+                  className={`py-2 rounded-xl font-bold transition ${authMode === 'LOGIN'
                     ? 'bg-neutral-850 text-white shadow-md border border-neutral-700/60'
                     : 'text-neutral-400 hover:text-neutral-200'
                     }`}
@@ -1123,8 +1387,9 @@ function FluentiaPathContent() {
                   onClick={() => {
                     setAuthMode('REGISTER');
                     setAuthError(null);
+                    setAuthSuccessMessage(null);
                   }}
-                  className={`py-2.5 rounded-xl font-bold transition ${authMode === 'REGISTER'
+                  className={`py-2 rounded-xl font-bold transition ${authMode === 'REGISTER'
                     ? 'bg-neutral-850 text-white shadow-md border border-neutral-700/60'
                     : 'text-neutral-400 hover:text-neutral-200'
                     }`}
@@ -1133,7 +1398,26 @@ function FluentiaPathContent() {
                 </button>
               </div>
 
-              <form onSubmit={handleAuthSubmit} className="space-y-4">
+              <form onSubmit={handleAuthSubmit} className="space-y-3.5">
+                {authMode === 'REGISTER' && (
+                  <div>
+                    <label className="text-xs font-semibold text-neutral-300 block mb-1.5">
+                      Nombre Completo
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3" />
+                      <input
+                        type="text"
+                        required
+                        value={fullNameInput}
+                        onChange={(e) => setFullNameInput(e.target.value)}
+                        placeholder="David Abarca"
+                        className="w-full bg-neutral-950/80 border border-neutral-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/80 transition"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-xs font-semibold text-neutral-300 block mb-1.5">
                     Correo Electrónico
@@ -1160,7 +1444,7 @@ function FluentiaPathContent() {
                     <input
                       type="password"
                       required
-                      minLength={8}
+                      minLength={6}
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
                       placeholder="••••••••••••"
@@ -1176,10 +1460,17 @@ function FluentiaPathContent() {
                   </div>
                 )}
 
+                {authSuccessMessage && (
+                  <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{authSuccessMessage}</span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={authLoading}
-                  className="w-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:opacity-95 text-neutral-950 font-black py-3 rounded-xl text-xs transition shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:opacity-95 text-neutral-950 font-black py-3 rounded-xl text-xs transition shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   <span>{authLoading ? 'Verificando...' : authMode === 'LOGIN' ? 'Entrar a Mi Cuenta' : 'Crear Cuenta y Comenzar'}</span>
                   <ArrowRight className="w-4 h-4" />
@@ -1190,7 +1481,7 @@ function FluentiaPathContent() {
                 <button
                   type="button"
                   onClick={handleGuestDemo}
-                  className="text-xs text-neutral-400 hover:text-emerald-400 transition underline underline-offset-4"
+                  className="text-xs text-neutral-400 hover:text-emerald-400 transition underline underline-offset-4 cursor-pointer"
                 >
                   O explora directamente como Invitado sin registrarte
                 </button>
@@ -1333,6 +1624,73 @@ function FluentiaPathContent() {
             </button>
           </div>
         </div>
+
+        {/* Acceso Rápido al Test de Nivelación Adaptativo */}
+        <button
+          onClick={() => {
+            setIsPlacementTestOpen(true);
+            soundManager.playClick();
+          }}
+          className="w-full flex items-center justify-between p-2.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/30 text-purple-200 text-xs font-bold transition shadow-sm group cursor-pointer"
+          title="Medir tu nivel MCER de A1 a C2 con 10 preguntas adaptativas"
+        >
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-4 h-4 text-purple-400 group-hover:scale-110 transition" />
+            <span>Test de Nivelación</span>
+          </div>
+          <span className="text-[10px] font-mono bg-purple-900/60 border border-purple-500/30 px-1.5 py-0.5 rounded text-purple-200 font-extrabold">
+            Adaptativo
+          </span>
+        </button>
+
+        {/* Acceso a Nativa Premium o Badge de Estado */}
+        {isUserPremium ? (
+          <div className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-300 text-xs font-bold shadow-sm">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>Nativa Premium Activo</span>
+            </div>
+            <span className="text-[10px] font-mono bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-200">
+              PRO
+            </span>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setPaywallReason('Desbloquea los niveles B1 a C2, el Track de Call Center BPO y las correcciones de IA ilimitadas.');
+              setIsPaywallModalOpen(true);
+              soundManager.playClick();
+            }}
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/10 hover:from-amber-500/30 hover:to-amber-600/20 border border-amber-500/40 text-amber-200 text-xs font-bold transition shadow-sm group cursor-pointer"
+            title="Activar suscripción Premium o canjear licencia B2B"
+          >
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-amber-400 group-hover:scale-110 transition" />
+              <span>Obtener Nativa Premium</span>
+            </div>
+            <span className="text-[10px] font-mono bg-amber-500/30 border border-amber-500/40 px-1.5 py-0.5 rounded text-amber-300 font-extrabold">
+              B1-C2
+            </span>
+          </button>
+        )}
+
+        {/* Acceso a Mis Certificados Oficiales */}
+        <button
+          onClick={() => {
+            setIsCertificatesModalOpen(true);
+            soundManager.playClick();
+          }}
+          className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-yellow-500/5 hover:from-amber-500/25 hover:to-yellow-500/15 border border-amber-500/30 text-amber-200 text-xs font-bold transition shadow-sm group cursor-pointer"
+          title="Ver y descargar mis diplomas y certificados en PDF"
+        >
+          <div className="flex items-center gap-2">
+            <Award className="w-4 h-4 text-amber-400 group-hover:scale-110 transition" />
+            <span>Mis Certificados</span>
+          </div>
+          <span className="text-[10px] font-mono bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded text-amber-300 font-extrabold">
+            PDF
+          </span>
+        </button>
 
         {/* Selector de Vista Principal: 5 Modos (Ruta, Inmersión, Temario, Proyectos, Repaso) */}
         <div className="space-y-1.5">
@@ -1861,6 +2219,31 @@ function FluentiaPathContent() {
                               <div key={sub.id} className="relative flex flex-col items-center group">
                                 <button
                                   onClick={() => {
+                                    const isPaywallOn = AppStorage.getPaywallEnabled();
+                                    const isPremium = AppStorage.isUserPremium();
+                                    const isRestrictedLevel = ['B1', 'B2', 'C1', 'C2'].includes(lesson.level.toUpperCase());
+                                    const isCallCenterTrack = languageId === 'call-center' || languageId.includes('call-center');
+
+                                    if (isPaywallOn && !isPremium && (isRestrictedLevel || isCallCenterTrack)) {
+                                      setPaywallReason(
+                                        isCallCenterTrack 
+                                          ? 'El Track de Call Center BPO requiere una suscripción Nativa Premium activa.'
+                                          : `Los sub-nodos del nivel ${lesson.level} requieren Nativa Premium.`
+                                      );
+                                      setIsPaywallModalOpen(true);
+                                      soundManager.playWrong();
+                                      return;
+                                    }
+
+                                    // Alerta de Contenido B2-C2 en Curaduría (Tarea 4)
+                                    const isB2C2 = ['B2', 'C1', 'C2'].includes(lesson.level.toUpperCase());
+                                    if (isB2C2 && sub.type === 'reading') {
+                                      setB2c2AlertLevel(lesson.level);
+                                      setB2c2AlertModalOpen(true);
+                                      soundManager.playClick();
+                                      return;
+                                    }
+
                                     setActiveSubNode(sub);
                                     soundManager.playClick();
                                   }}
@@ -2623,6 +3006,92 @@ function FluentiaPathContent() {
                         </span>
                       </div>
 
+                      {/* Barra de Herramientas de Formato (Rich Text) y Conectores de Discurso */}
+                      <div className="p-2.5 rounded-xl bg-[#090e18] border border-slate-800 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] font-mono text-slate-400 uppercase font-bold mr-1">Formato:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProjectTextDraft((prev) => (prev || '') + ' **texto** ');
+                                soundManager.playClick();
+                              }}
+                              title="Negrita"
+                              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold font-mono transition"
+                            >
+                              <Bold className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProjectTextDraft((prev) => (prev || '') + ' *texto* ');
+                                soundManager.playClick();
+                              }}
+                              title="Cursiva"
+                              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-serif italic transition"
+                            >
+                              <Italic className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProjectTextDraft((prev) => (prev || '') + '\n- ');
+                                soundManager.playClick();
+                              }}
+                              title="Lista de Puntos"
+                              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition"
+                            >
+                              <List className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProjectTextDraft((prev) => (prev || '') + '\n> ');
+                                soundManager.playClick();
+                              }}
+                              title="Cita Académica"
+                              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition"
+                            >
+                              <Quote className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <span className="text-[10px] font-mono text-purple-400 bg-purple-950/50 border border-purple-500/30 px-2 py-0.5 rounded-md">
+                            Rúbrica TBLT Cambridge
+                          </span>
+                        </div>
+
+                        {/* Conectores Académicos de Alta Cohesión */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="text-[10px] font-mono text-slate-500 uppercase font-bold mr-1">Conectores:</span>
+                          {[
+                            'Furthermore,',
+                            'Nevertheless,',
+                            'Consequently,',
+                            'In contrast,',
+                            'Moreover,',
+                            'Therefore,'
+                          ].map((connector) => (
+                            <button
+                              key={connector}
+                              type="button"
+                              onClick={() => {
+                                setProjectTextDraft((prev) => {
+                                  const cur = prev || '';
+                                  const space = cur && !cur.endsWith(' ') ? ' ' : '';
+                                  return cur + space + connector + ' ';
+                                });
+                                soundManager.playClick();
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/30 text-purple-200 text-[11px] font-mono transition hover:scale-105"
+                            >
+                              +{connector}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <textarea
                         value={draftText}
                         onChange={(e) => setProjectTextDraft(e.target.value)}
@@ -2720,6 +3189,48 @@ function FluentiaPathContent() {
                           </span>
                           <p>{submission.feedback}</p>
                         </div>
+
+                        {/* 3 Consejos Específicos de Mejora (Rúbrica TBLT) */}
+                        {submission.tips && submission.tips.length > 0 && (
+                          <div className="p-4 rounded-2xl bg-amber-950/25 border border-amber-500/40 text-xs text-amber-200 leading-relaxed space-y-2.5">
+                            <span className="font-bold font-mono text-[10px] text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                              3 Consejos de Mejora Inmediata (Oxford/Cambridge):
+                            </span>
+                            <ul className="space-y-2">
+                              {submission.tips.map((tip, tIdx) => (
+                                <li key={tIdx} className="flex items-start gap-2 text-slate-300">
+                                  <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                    {tIdx + 1}
+                                  </span>
+                                  <span className="leading-snug">{tip}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Proveedor de IA utilizado */}
+                        {submission.providerUsed && (
+                          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1">
+                            <span>Motor IA Evaluador:</span>
+                            <span className="text-purple-300 bg-purple-950/50 border border-purple-500/30 px-2 py-0.5 rounded text-[10px]">
+                              {submission.providerUsed}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Botón para Reescribir / Perfeccionar */}
+                        <button
+                          onClick={() => {
+                            setProjectTextDraft(submission.content);
+                            soundManager.playClick();
+                          }}
+                          className="w-full py-2.5 rounded-xl border border-purple-500/40 hover:bg-purple-950/40 text-purple-300 text-xs font-bold transition flex items-center justify-center gap-2"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Reescribir / Perfeccionar con los Consejos</span>
+                        </button>
 
                         <div className="text-center pt-2">
                           <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-full font-bold">
@@ -4213,6 +4724,93 @@ function FluentiaPathContent() {
           setImmersionMinutes((prev) => prev + mins);
         }}
       />
+
+      {/* Modal del Test de Nivelación Adaptativo */}
+      <PlacementTestModal
+        isOpen={isPlacementTestOpen}
+        onClose={() => setIsPlacementTestOpen(false)}
+        userId={user?.id}
+        onLevelAssigned={(level, unlockedNodes) => {
+          setCompletedNodeIds(unlockedNodes);
+          setUserProfile(AppStorage.getUserProfile());
+          setUserXp(AppStorage.getXp());
+          triggerCloudSync();
+        }}
+      />
+
+      {/* Modal de Venta y Activación de Nativa Premium (Fase 5) */}
+      <PremiumPaywallModal
+        isOpen={isPaywallModalOpen}
+        onClose={() => setIsPaywallModalOpen(false)}
+        reason={paywallReason}
+        onUnlocked={() => {
+          setIsUserPremium(true);
+          triggerCloudSync();
+        }}
+      />
+
+      {/* Modal de Mis Certificados Oficiales PDF (Tarea 2) */}
+      <CertificatesModal
+        isOpen={isCertificatesModalOpen}
+        onClose={() => setIsCertificatesModalOpen(false)}
+        completedNodeIds={completedNodeIds}
+        studentName={userProfile.name || 'David Abarca'}
+        currentLevel={userProfile.targetLevel || 'A1'}
+      />
+
+      {/* Modal de Alerta: Contenido B2-C2 en Curaduría (Tarea 4) */}
+      <AnimatePresence>
+        {b2c2AlertModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-[#080d18] border border-purple-500/40 rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl relative"
+            >
+              <button
+                onClick={() => setB2c2AlertModalOpen(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center shadow-md">
+                <BookOpen className="w-6 h-6" />
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono text-purple-300 uppercase tracking-widest font-black bg-purple-950/60 border border-purple-500/30 px-2.5 py-0.5 rounded-md">
+                  Nivel {b2c2AlertLevel} • En Curaduría
+                </span>
+                <h3 className="text-lg font-black text-white tracking-tight">
+                  Lecturas Avanzadas en Curaduría Pedagógica
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Los textos científicos y artículos indexados de lectura para el nivel <strong className="text-purple-300">{b2c2AlertLevel}</strong> están siendo curados bajo estándares de Oxford Academic, Nature y The Economist.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs text-purple-200 space-y-1.5">
+                <span className="font-bold block text-[11px] text-purple-300 font-mono">
+                  💡 Actividades Disponibles para este Nivel:
+                </span>
+                <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                  <li>Las 6 etapas de la lección troncal con audio y pronunciación.</li>
+                  <li>El Taller de Proyectos TBLT evaluado con rúbricas de IA.</li>
+                </ul>
+              </div>
+
+              <button
+                onClick={() => setB2c2AlertModalOpen(false)}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition cursor-pointer shadow-md shadow-purple-600/20"
+              >
+                Entendido, Continuar con la Lección
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

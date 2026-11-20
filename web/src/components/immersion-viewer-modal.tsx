@@ -20,12 +20,16 @@ import {
   ArrowLeft,
   Bot,
   Layers,
-  FileText
+  FileText,
+  Play,
+  Pause,
+  Square
 } from 'lucide-react';
 import { SubNode, ExtensiveStory } from '../content/course-content';
 import { soundManager } from '../lib/sound-effects';
 import { AppStorage } from '../lib/storage';
 import { PersonalizedInputEngine } from '../lib/personalized-input-engine';
+import { karaokeTTS, KaraokeWordPosition } from '../lib/karaoke-tts';
 
 interface ImmersionViewerModalProps {
   subNode: SubNode | null;
@@ -54,7 +58,9 @@ export function ImmersionViewerModal({
   } | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [isPlayingFullAudio, setIsPlayingFullAudio] = useState(false);
-  const [audioSpeed, setAudioSpeed] = useState<number>(1.0);
+  const [isAudioPaused, setIsAudioPaused] = useState(false);
+  const [audioSpeed, setAudioSpeed] = useState<number>(0.95);
+  const [karaokeWord, setKaraokeWord] = useState<KaraokeWordPosition | null>(null);
 
   // Estados para Extensive Reading (Inmersión Masiva)
   const [isExtensiveMode, setIsExtensiveMode] = useState(false);
@@ -75,6 +81,7 @@ export function ImmersionViewerModal({
   // Limpiar síntesis de voz al desmontar o cerrar
   useEffect(() => {
     return () => {
+      karaokeTTS.stop();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -98,13 +105,51 @@ export function ImmersionViewerModal({
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-GB';
+    utterance.lang = 'en-US';
     utterance.rate = rate;
     utterance.pitch = 1.0;
     utterance.onend = () => {
       if (onEnd) onEnd();
     };
     window.speechSynthesis.speak(utterance);
+  };
+
+  // Control maestro de lectura Karaoke con sincronización fonética
+  const handleToggleKaraoke = (paragraphs: string[]) => {
+    if (isPlayingFullAudio) {
+      if (isAudioPaused) {
+        karaokeTTS.resume();
+        setIsAudioPaused(false);
+        soundManager.playClick();
+      } else {
+        karaokeTTS.pause();
+        setIsAudioPaused(true);
+        soundManager.playClick();
+      }
+    } else {
+      setIsPlayingFullAudio(true);
+      setIsAudioPaused(false);
+      soundManager.playClick();
+      const userProfile = AppStorage.getUserProfile();
+      karaokeTTS.play(paragraphs, {
+        rate: audioSpeed,
+        accent: userProfile?.accentPreference || 'uk',
+        onWord: (pos) => setKaraokeWord(pos),
+        onEnd: () => {
+          setIsPlayingFullAudio(false);
+          setIsAudioPaused(false);
+          setKaraokeWord(null);
+        }
+      });
+    }
+  };
+
+  const handleStopKaraoke = () => {
+    karaokeTTS.stop();
+    setIsPlayingFullAudio(false);
+    setIsAudioPaused(false);
+    setKaraokeWord(null);
+    soundManager.playClick();
   };
 
   const handleWordClick = (rawWord: string, e: React.MouseEvent, vocabDictionary?: Record<string, string>) => {
@@ -318,27 +363,68 @@ export function ImmersionViewerModal({
                     </span>
                   </div>
 
-                  {/* Botón de Audio Narrativo */}
-                  <button
-                    onClick={() => {
-                      if (isPlayingFullAudio) {
-                        window.speechSynthesis.cancel();
-                        setIsPlayingFullAudio(false);
-                      } else {
-                        setIsPlayingFullAudio(true);
-                        const allText = reading.paragraphs.join(' ');
-                        speakText(allText, () => setIsPlayingFullAudio(false));
-                      }
-                    }}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition border ${
-                      isPlayingFullAudio
-                        ? 'bg-rose-950/60 border-rose-500/40 text-rose-300 animate-pulse'
-                        : 'bg-[#0e1626] border-slate-700 text-slate-200 hover:border-emerald-500/40 hover:text-emerald-300'
-                    }`}
-                  >
-                    {isPlayingFullAudio ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-emerald-400" />}
-                    <span>{isPlayingFullAudio ? 'Detener Audio' : 'Escuchar Narración'}</span>
-                  </button>
+                  {/* Botones de Control de Audio Karaoke en Tiempo Real */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleKaraoke(reading.paragraphs)}
+                      className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                        isPlayingFullAudio && !isAudioPaused
+                          ? 'bg-emerald-950/70 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30'
+                          : isAudioPaused
+                          ? 'bg-amber-950/70 border-amber-500 text-amber-300'
+                          : 'bg-[#0e1626] border-slate-700 text-slate-200 hover:border-emerald-500/40 hover:text-emerald-300'
+                      }`}
+                    >
+                      {isPlayingFullAudio && !isAudioPaused ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5 fill-current" />
+                          <span>Pausar</span>
+                        </>
+                      ) : isAudioPaused ? (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Reanudar</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 text-emerald-400 fill-current" />
+                          <span>Escuchar (Play)</span>
+                        </>
+                      )}
+                    </button>
+
+                    {isPlayingFullAudio && (
+                      <button
+                        onClick={handleStopKaraoke}
+                        className="p-1.5 rounded-xl bg-slate-900 hover:bg-rose-950/50 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                        title="Detener Audio"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    )}
+
+                    {/* Selector de Velocidad */}
+                    <div className="flex items-center bg-slate-900 rounded-xl p-0.5 border border-slate-800 text-[10px] font-mono">
+                      {[0.8, 0.95, 1.2].map(speed => (
+                        <button
+                          key={speed}
+                          onClick={() => {
+                            setAudioSpeed(speed);
+                            if (isPlayingFullAudio) {
+                              handleStopKaraoke();
+                            }
+                          }}
+                          className={`px-2 py-0.5 rounded-lg font-bold transition cursor-pointer ${
+                            audioSpeed === speed 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {speed}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Aviso amigable de interactividad */}
@@ -347,12 +433,12 @@ export function ImmersionViewerModal({
                   <span>Toca o haz clic en cualquier palabra para ver su significado inmediato y escuchar su pronunciación.</span>
                 </div>
 
-                {/* Texto de la Historia Principal con Glosario Interactivo SRS */}
+                {/* Texto de la Historia Principal con Glosario Interactivo SRS y Resaltado Karaoke */}
                 <div className="space-y-4 font-sans leading-relaxed text-base md:text-lg text-slate-200 selection:bg-amber-500/30 selection:text-amber-200">
                   {reading.paragraphs.map((paragraph, pIdx) => {
-                    const words = paragraph.split(' ');
+                    const words = paragraph.split(/\s+/).filter(Boolean);
                     return (
-                      <p key={pIdx} className="p-3.5 rounded-2xl bg-[#090d16]/70 border border-slate-800/40 hover:border-slate-700/60 transition">
+                      <p key={pIdx} className="p-4 rounded-2xl bg-[#090d16]/70 border border-slate-800/40 hover:border-slate-700/60 transition">
                         {words.map((w, wIdx) => {
                           const clean = w.replace(/[^a-zA-Z0-9']/g, '').toLowerCase();
                           const isVocab = reading.vocabulary && Object.keys(reading.vocabulary).some(k => {
@@ -360,12 +446,17 @@ export function ImmersionViewerModal({
                             const parts = cleanK.split(/\s+/).filter(Boolean);
                             return k.toLowerCase() === clean || parts.includes(clean);
                           });
+
+                          const isKaraokeActive = isPlayingFullAudio && karaokeWord?.paragraphIndex === pIdx && karaokeWord?.wordIndex === wIdx;
+
                           return (
                             <span
                               key={wIdx}
                               onClick={(e) => handleWordClick(w, e)}
-                              className={`cursor-pointer transition duration-150 inline-block px-0.5 rounded ${
-                                isVocab 
+                              className={`cursor-pointer transition-all duration-150 inline-block px-1 py-0.5 rounded ${
+                                isKaraokeActive
+                                  ? 'bg-gradient-to-r from-emerald-400 to-teal-300 text-slate-950 font-black shadow-lg shadow-emerald-500/50 scale-110 ring-2 ring-emerald-300 z-10'
+                                  : isVocab 
                                   ? 'text-amber-300 font-semibold underline decoration-amber-500/50 decoration-2 underline-offset-4 hover:bg-amber-950/60 hover:text-white' 
                                   : 'hover:text-emerald-300 hover:bg-slate-800/70'
                               }`}
@@ -548,43 +639,67 @@ export function ImmersionViewerModal({
                           </h3>
                         </div>
 
-                        <button
-                          onClick={() => {
-                            if (isPlayingFullAudio) {
-                              window.speechSynthesis.cancel();
-                              setIsPlayingFullAudio(false);
-                            } else {
-                              setIsPlayingFullAudio(true);
-                              const fullText = currentStory.paragraphs.join(' ');
-                              speakText(fullText, () => setIsPlayingFullAudio(false));
-                            }
-                          }}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
-                            isPlayingFullAudio
-                              ? 'bg-rose-950/60 border-rose-500/40 text-rose-300 animate-pulse'
-                              : 'bg-[#0e1626] border-slate-700 text-slate-200 hover:border-teal-500/40 hover:text-teal-300'
-                          }`}
-                        >
-                          {isPlayingFullAudio ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-teal-400" />}
-                          <span>{isPlayingFullAudio ? 'Detener' : 'Escuchar Historia'}</span>
-                        </button>
+                        {/* Controles Karaoke para Historias Extensivas */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleToggleKaraoke(currentStory.paragraphs)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                              isPlayingFullAudio && !isAudioPaused
+                                ? 'bg-teal-950/70 border-teal-500 text-teal-300 ring-2 ring-teal-500/30'
+                                : isAudioPaused
+                                ? 'bg-amber-950/70 border-amber-500 text-amber-300'
+                                : 'bg-[#0e1626] border-slate-700 text-slate-200 hover:border-teal-500/40 hover:text-teal-300'
+                            }`}
+                          >
+                            {isPlayingFullAudio && !isAudioPaused ? (
+                              <>
+                                <Pause className="w-3.5 h-3.5 fill-current" />
+                                <span>Pausar</span>
+                              </>
+                            ) : isAudioPaused ? (
+                              <>
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <span>Reanudar</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3.5 h-3.5 text-teal-400 fill-current" />
+                                <span>Escuchar (Play)</span>
+                              </>
+                            )}
+                          </button>
+
+                          {isPlayingFullAudio && (
+                            <button
+                              onClick={handleStopKaraoke}
+                              className="p-1.5 rounded-xl bg-slate-900 hover:bg-rose-950/50 border border-slate-800 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                              title="Detener Audio"
+                            >
+                              <Square className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Párrafos Clicables de la Historia Extensiva */}
                       <div className="space-y-3 font-sans leading-relaxed text-sm sm:text-base text-slate-200">
                         {currentStory.paragraphs.map((p, pIdx) => {
-                          const words = p.split(' ');
+                          const words = p.split(/\s+/).filter(Boolean);
                           return (
-                            <p key={pIdx} className="p-3 rounded-xl bg-[#0b101c] border border-slate-800/40">
+                            <p key={pIdx} className="p-3.5 rounded-xl bg-[#0b101c] border border-slate-800/40">
                               {words.map((w, wIdx) => {
                                 const clean = w.replace(/[^a-zA-Z']/g, '').toLowerCase();
                                 const isVocab = currentStory.vocabulary && currentStory.vocabulary[clean];
+                                const isKaraokeActive = isPlayingFullAudio && karaokeWord?.paragraphIndex === pIdx && karaokeWord?.wordIndex === wIdx;
+
                                 return (
                                   <span
                                     key={wIdx}
                                     onClick={(e) => handleWordClick(w, e, currentStory.vocabulary)}
-                                    className={`cursor-pointer transition duration-150 inline-block px-0.5 rounded ${
-                                      isVocab
+                                    className={`cursor-pointer transition-all duration-150 inline-block px-1 py-0.5 rounded ${
+                                      isKaraokeActive
+                                        ? 'bg-gradient-to-r from-teal-400 to-cyan-300 text-slate-950 font-black shadow-lg shadow-teal-500/50 scale-110 ring-2 ring-teal-300 z-10'
+                                        : isVocab
                                         ? 'text-teal-300 font-semibold underline decoration-teal-500/40 decoration-2 underline-offset-4 hover:bg-teal-950/60 hover:text-white'
                                         : 'hover:text-teal-300 hover:bg-slate-800/70'
                                     }`}

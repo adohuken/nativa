@@ -1,0 +1,347 @@
+================================================================================
+          NATIVA LEARNING ENGINE • INVENTARIO TÉCNICO Y CURRICULAR COMPLETO
+================================================================================
+Generado: 2026-11-20
+Proyecto: Nativa (Plataforma Educativa SaaS de Adquisición Natural de Idiomas)
+Enfoque Metodológico: Stephen Krashen (SLA) • Input Comprensible (i + 1) • TBLT
+Auditoría y Mapeo: Currículo, Módulos, Idiomas, Tracks, Tiempos y Oportunidades
+================================================================================
+
+--------------------------------------------------------------------------------
+1. RESUMEN EJECUTIVO Y ARQUITECTURA DE LA PLATAFORMA
+--------------------------------------------------------------------------------
+Nativa es una plataforma SaaS de tecnología educativa diseñada para permitir la
+adquisición fluida del inglés (y otros idiomas) sin traducción mental, basada en
+las investigaciones de Stephen Krashen (Second Language Acquisition - SLA) y en
+el estándar europeo MCER (Marco Común Europeo de Referencia para las Lenguas).
+
+La plataforma consta de 5 pilares tecnológicos y pedagógicos:
+  1. Ruta de Aprendizaje Estructurada (Learning Path Serpentina con Nodos Madre y
+     Sub-nodos de Inmersión en Lectura, Escucha Receptiva y Repaso Espaciado SRS).
+  2. Motor de Audio Fonético y TTS Karaoke (Web Speech API nativa + resaltado en
+     tiempo real de palabras sincronizado con el habla).
+  3. Evaluador de Proyectos TBLT con Inteligencia Artificial (Evaluación en 4
+     dimensiones de Oxford/Cambridge: Logro de Tarea, Cohesión, Vocabulario y
+     Gramática, otorgando calificación /100 y 3 consejos accionables).
+  4. Test de Nivelación Adaptativo (Placement Test de 10 preguntas de A1 a C2
+     con algoritmo dinámico de ascenso con 3 aciertos y descenso con 2 fallos).
+  5. Modelo Comercial SaaS con Paywall Maestro (CPanel administrativo, toggle
+     PAYWALL_ENABLED, transferencias locales BANPRO y licencias B2B corporativas).
+
+
+--------------------------------------------------------------------------------
+2. CATÁLOGO DE IDIOMAS REGISTRADOS
+--------------------------------------------------------------------------------
+El sistema cuenta con un Registro de Idiomas multi-lenguaje extensible:
+
+[1] INGLÉS (English - 🇬🇧)
+    - Estado: ACTIVO (100% Funcional y Disponible)
+    - Alcance: A1 hasta C2 (6 Niveles MCER completos) + Track Especializado
+    - Tagline: "Supervivencia Universitaria & Fluidez Académica"
+    - Descripción: Adquisición natural desde los pasillos de Covent Garden hasta
+      la defensa de tesis en Oxford con enfoque comunicativo y académico.
+    - Lecciones Madre troncales: 24
+    - Sub-nodos de Inmersión: 35+
+    - Proyectos TBLT evaluados por IA: 6
+    - Vocabulario AWL (Academic Word List) integrado: > 1,200 términos
+
+[2] FRANCÉS (Français - 🇫🇷)
+    - Estado: PRÓXIMAMENTE (Arquitectura base lista en cPanel)
+    - Alcance Proyectado: A1 a C2 (24 Lecciones)
+    - Tagline: "La Sorbona, Barrio Latino y Francés Universitario"
+    - Enfoque: Francés Lengua Extranjera (FLE), debate académico y vida estudiantil.
+
+[3] ALEMÁN (Deutsch - 🇩🇪)
+    - Estado: PRÓXIMAMENTE (Arquitectura base lista en cPanel)
+    - Alcance Proyectado: A1 a C2 (24 Lecciones)
+    - Tagline: "Ciencia, Tecnología e Innovación Universitaria"
+    - Enfoque: Precisión técnica en TU Munich, ingeniería y vida en Berlín.
+
+[4] ITALIANO (Italiano - 🇮🇹)
+    - Estado: PRÓXIMAMENTE (Arquitectura base lista en cPanel)
+    - Alcance Proyectado: A1 a C2 (24 Lecciones)
+    - Tagline: "Humanidades, Arte, Diseño y Expresión Cultural"
+    - Enfoque: Universidad de Bolonia, diseño, artes visuales y gastronomía.
+
+[5] JAPONÉS (日本語 - 🇯🇵)
+    - Estado: PRÓXIMAMENTE (Arquitectura base lista en cPanel)
+    - Alcance Proyectado: N5 a N1 / A1 a C2 (24 Lecciones)
+    - Tagline: "Inmersión Contextual en Tokio & Lenguaje Académico"
+    - Enfoque: Contexto metropolitano de Tokio, kanji contextual y cortesía keigo.
+
+
+--------------------------------------------------------------------------------
+3. INVENTARIO DE CURSOS DISPONIBLES EN LA PLATAFORMA
+--------------------------------------------------------------------------------
+
+A. CURSO GENERAL: INGLÉS UNIVERSITARIO & FLUIDEZ ACADÉMICA (A1 - C2)
+   - Estructura: 6 Niveles • 6 Módulos troncales • 24 Lecciones Intensivas
+   - Metodología de cada lección (6 Etapas consecutivas):
+       Etapa 1: Inmersión Sonora Auténtica (Diálogo nativo contextual de 6-8 turnos)
+       Etapa 2: Comprensión Auditiva Global (Pregunta Gist de comprensión profunda)
+       Etapa 3: Constructor de Oraciones (Sintaxis muscular por bloques táctiles)
+       Etapa 4: Shadowing Studio (Grabación y entrenamiento neuromuscular fonético)
+       Etapa 5: Reparación del Monitor (Identificación y erradicación del error hispano)
+       Etapa 6: Reto Final de Maestría (Desbloqueo de candado para avanzar de nodo)
+
+B. TRACK ESPECIALIZADO: CALL CENTER ENGLISH & BPO OPERATIONS
+   - Nivel objetivo: B1 - B2 Profesional
+   - Estructura: 4 Módulos operativos • 8 Lecciones prácticas • 24 Sub-nodos
+   - Enfoque: Servicio al cliente telefónico, desescalamiento de quejas, empatía,
+     soporte técnico (tier 1 & tier 2), terminología de métricas BPO (AHT, FCR,
+     CSAT) y simulaciones de entrevistas de trabajo en call centers.
+
+
+--------------------------------------------------------------------------------
+4. DESGLOSE DETALLADO DE MÓDULOS Y LECCIONES (CURSO GENERAL DE INGLÉS)
+--------------------------------------------------------------------------------
+
+================================================================================
+NIVEL A1 • ACCESO INICIAL (BREAKTHROUGH)
+Unidad 1 • Fundamentos y Supervivencia Universitaria
+================================================================================
+• Lección 1.1: "Llegar a Londres: quién soy y de dónde vengo"
+  - Situación: Centro de conferencias de Covent Garden y registro en residencia.
+  - Proyecto Académico: Presentarse formal e informalmente y llenar formularios.
+  - Sub-nodos de Inmersión:
+      * 1.1-Reading: "Arriving at the Conference" + 2 Crónicas Extensivas.
+      * 1.1-Listening: "Arriving at the London Hotel" (Diálogo con recepción).
+      * 1.1-SRS: Vocabulario clave de países, saludos y profesiones.
+  - Duración estimada: ~25 minutos de lección + ~12 minutos de sub-nodos.
+
+• Lección 1.2: "El inventario del campus: pedir y señalar lo que necesitas"
+  - Situación: La tienda universitaria y el escritorio de estudio en Bloomsbury.
+  - Proyecto Académico: Solicitar útiles y describir pertenencias académicas.
+  - Sub-nodos: Lectura "My University Room", Escucha "Borrowing a Pen", SRS.
+  - Duración estimada: ~22 minutos de lección + ~11 minutos de sub-nodos.
+
+• Lección 1.3: "Un día en la universidad: ritmos, rutinas y horarios"
+  - Situación: Clases matutinas, biblioteca y cafetería de estudiantes.
+  - Proyecto Académico: Explicar tu rutina semanal y horarios de estudio.
+  - Sub-nodos: Lectura "Daily Routine and Free Time", Escucha en cafetería, SRS.
+  - Duración estimada: ~24 minutos de lección + ~12 minutos de sub-nodos.
+
+• Lección 1.4: "Encontrar el aula: pedir indicaciones con cortesía"
+  - Situación: Navegar por los pasillos de la facultad y el metro de Londres.
+  - Proyecto Académico: Dar y seguir instrucciones espaciales en el campus.
+  - Sub-nodos: Lectura "Navigating the Campus Maze", Escucha de direcciones, SRS.
+  - Duración estimada: ~22 minutos de lección + ~10 minutos de sub-nodos.
+
+Taller TBLT Unidad 1:
+  "Carta de Admisión y Presentación Formal en la Facultad" (35 - 100 palabras).
+
+--------------------------------------------------------------------------------
+NIVEL A2 • PLATAFORMA (WAYSTAGE)
+Unidad 2 • Vida en el Campus, Experiencias y Proyectos
+================================================================================
+• Lección 2.1: "Mi primer fin de semana en Londres: contar qué hice"
+  - Foco SLA: Pasado simple regular e irregular en contextos memorables.
+  - Duración estimada: ~24 minutos.
+• Lección 2.2: "Compras en el campus: comparar precios y calidades"
+  - Foco SLA: Comparativos, superlativos y cuantificadores contables/incontables.
+  - Duración estimada: ~22 minutos.
+• Lección 2.3: "Compromisos y planes: organizar una salida con amigos"
+  - Foco SLA: Presente continuo para futuro agendado vs be going to.
+  - Duración estimada: ~23 minutos.
+• Lección 2.4: "Normas del campus: qué podemos y qué no podemos hacer"
+  - Foco SLA: Modales de obligación, prohibición y permiso (must, can, have to).
+  - Duración estimada: ~25 minutos.
+
+Taller TBLT Unidad 2:
+  "Cartel Normativo y Protocolo de Seguridad del Laboratorio" (50 - 130 palabras).
+
+--------------------------------------------------------------------------------
+NIVEL B1 • UMBRAL (THRESHOLD)
+Unidad 3 • Solución de Problemas y Narración Académica
+================================================================================
+• Lección 3.1: "Mi portafolio: lo que he logrado hasta hoy"
+  - Foco SLA: Presente perfecto para experiencias vitales y contraste con pasado.
+  - Duración estimada: ~26 minutos.
+• Lección 3.2: "Resolver problemas en el campus: si esto pasa, haremos aquello"
+  - Foco SLA: Primer y segundo condicional para planes de contingencia.
+  - Duración estimada: ~25 minutos.
+• Lección 3.3: "Evolución del entorno: cómo ha cambiado mi ciudad y universidad"
+  - Foco SLA: Pasado perfecto y marcadores cronológicos complejos.
+  - Duración estimada: ~27 minutos.
+• Lección 3.4: "Guía de servicios: cómo funciona el sistema de bibliotecas"
+  - Foco SLA: Voz pasiva en procesos formales e instructivos universitarios.
+  - Duración estimada: ~25 minutos.
+
+Taller TBLT Unidad 3:
+  "Curriculum Vitae Ejecutivo y Carta de Logros Verificables" (80 - 180 palabras).
+
+--------------------------------------------------------------------------------
+NIVEL B2 • AVANZADO INDEPENDIENTE (VANTAGE)
+Unidad 4 • Argumentación, Discurso Formal y Criterio Crítico
+================================================================================
+• Lección 4.1: "Estructurar un argumento: debatir ideas en comités"
+  - Foco SLA: Conectores de contraste formal (nevertheless, whereas, albeit).
+  - Duración estimada: ~28 minutos.
+• Lección 4.2: "Evaluar lo que pudo haber sido: análisis de decisiones pasadas"
+  - Foco SLA: Tercer condicional y modales retrospectivos (should have, could have).
+  - Duración estimada: ~28 minutos.
+• Lección 4.3: "Citar a los expertos: reportar discursos e investigaciones"
+  - Foco SLA: Reported speech con verbos declarativos académicos (claim, assert).
+  - Duración estimada: ~27 minutos.
+• Lección 4.4: "Llegar a conclusiones lógicas: deducir con las pruebas"
+  - Foco SLA: Modales de deducción lógica formal (must be, cannot be, might have).
+  - Duración estimada: ~28 minutos.
+
+Taller TBLT Unidad 4:
+  "Discurso de Debate Parlamentario Oxford: Ética e Inteligencia Artificial"
+  (110 - 240 palabras).
+
+--------------------------------------------------------------------------------
+NIVEL C1 • EFICACIA OPERATIVA (EFFECTIVE OPERATIONAL PROFICIENCY)
+Unidad 5 • Retórica Avanzada, Matices y Publicación Académica
+================================================================================
+• Lección 5.1: "El discurso que convence: cómo enfatizar sin gritar"
+  - Foco SLA: Inversión adverbial enfática y oraciones hendidas (cleft sentences).
+  - Duración estimada: ~30 minutos.
+• Lección 5.2: "El arte del matiz: expresar certeza cautelosa en papers"
+  - Foco SLA: Lenguaje de atenuación académica (Hedging & Stance).
+  - Duración estimada: ~29 minutos.
+• Lección 5.3: "Reformular con impacto: destacar lo que de verdad importa"
+  - Foco SLA: Nominalización y densidad léxica para estilo APA / Nature / Science.
+  - Duración estimada: ~30 minutos.
+• Lección 5.4: "El tono del debate: sonar diplomático y persuasivo"
+  - Foco SLA: Fórmulas de desacuerdo cortés e ironía académica encubierta.
+  - Duración estimada: ~30 minutos.
+
+Taller TBLT Unidad 5:
+  "Abstract Indexado y Ensayo Crítico con Estilo APA/MLA" (130 - 280 palabras).
+
+--------------------------------------------------------------------------------
+NIVEL C2 • MAESTRÍA Y DOMINIO NATIVO (MASTERY)
+Unidad 6 • Alta Diplomacia, Dialectos Globales y Defensa Doctoral
+================================================================================
+• Lección 6.1: "La negociación en la cumbre: decir mucho entre líneas"
+  - Foco SLA: Pragmática avanzada, ambigüedad deliberada y retórica diplomática.
+  - Duración estimada: ~32 minutos.
+• Lección 6.2: "Inglés sin fronteras: descifrar dialectos y acentos globales"
+  - Foco SLA: Variedades del inglés (RP Británico, Estándar Americano, Australiano,
+    Escocés y ELF - English as a Lingua Franca).
+  - Duración estimada: ~32 minutos.
+• Lección 6.3: "El texto impecable: pulir un artículo al nivel de Science"
+  - Foco SLA: Corrección estilística microscópica, colocaciones raras y cohesión.
+  - Duración estimada: ~34 minutos.
+• Lección 6.4: "La defensa del doctorado: soltura absoluta ante el tribunal"
+  - Foco SLA: Manejo de preguntas hostiles del jurado y réplica en tiempo real.
+  - Duración estimada: ~35 minutos.
+
+Taller TBLT Unidad 6:
+  "Discurso de Clausura y Defensa de Tesis Doctoral C2" (150 - 350 palabras).
+
+
+--------------------------------------------------------------------------------
+5. DESGLOSE DEL TRACK ESPECIALIZADO: CALL CENTER BPO
+--------------------------------------------------------------------------------
+Módulo 1: "Atención Telefónica y Saludos Profesionales" (B1)
+  - 1.1 Apertura de llamada, modulación de voz y empatía inicial.
+  - 1.2 Verificación de identidad bajo protocolos de seguridad PCI/GDPR.
+Módulo 2: "Manejo de Clientes Difíciles y Desescalamiento" (B1+)
+  - 2.1 Técnicas de escucha activa y frases calmantes sin asumir culpas legales.
+  - 2.2 Reencuadre positivo y ofrecimiento de alternativas viables.
+Módulo 3: "Soporte Técnico y Solución de Problemas (Troubleshooting)" (B2)
+  - 3.1 Preguntas de diagnóstico paso a paso guiando al cliente ciego.
+  - 3.2 Escalamiento a nivel 2 y documentación precisa de tickets en CRM.
+Módulo 4: "Entrevistas de Trabajo y Simulaciones de Llamada (Mock Calls)" (B2+)
+  - 4.1 Preguntas conductuales comunes en reclutamiento BPO (Método STAR).
+  - 4.2 Simulación en vivo de llamadas con límite estricto de AHT y métricas.
+Duración total estimada del Track Call Center: ~16 a 20 horas de entrenamiento.
+
+
+--------------------------------------------------------------------------------
+6. MÉTRICAS DE TIEMPO PROMEDIO Y DEDICACIÓN ACADÉMICA
+--------------------------------------------------------------------------------
+
+A. TIEMPOS POR TIPO DE ACTIVIDAD INDIVIDUAL:
+  ┌──────────────────────────────────────────────┬────────────────────────────┐
+  │ Componente Pedagógico                        │ Duración Promedio          │
+  ├──────────────────────────────────────────────┼────────────────────────────┤
+  │ Lección Troncal Madre (6 Etapas guiadas)     │ 20 - 30 minutos            │
+  │ Sub-nodo: Lectura de Inmersión Comprensible  │ 3 - 5 minutos (~220 pal.)  │
+  │ Sub-nodo: Escucha Receptiva con Audio/Guión  │ 2 - 4 minutos (audio + txt)│
+  │ Sub-nodo: Repaso Espaciado SRS (Flashcards)  │ 3 - 5 minutos (6-8 tarjetas│
+  │ Paquete Completo de 3 Sub-nodos por Lección  │ 8 - 14 minutos             │
+  │ Proyecto Escrito TBLT evaluado con IA        │ 15 - 25 minutos            │
+  │ Test de Nivelación Adaptativo (10 items)     │ 6 - 9 minutos              │
+  │ Sesión Diaria Recomendada de Estudio         │ 45 minutos continuos       │
+  └──────────────────────────────────────────────┴────────────────────────────┘
+
+B. ESTIMACIÓN DE HORAS TOTALES POR NIVEL MCER (CURSO GENERAL):
+  ┌───────┬────────────┬─────────────┬──────────────┬─────────────────────────┐
+  │ Nivel │ Lecciones  │ Sub-nodos   │ Proyectos IA │ Horas de Inmersión Est. │
+  ├───────┼────────────┼─────────────┼──────────────┼─────────────────────────┤
+  │ A1    │ 4 Madre    │ 12 Nodos    │ 1 TBLT       │ 8 - 12 Horas            │
+  │ A2    │ 4 Madre    │ 12 Nodos    │ 1 TBLT       │ 10 - 14 Horas           │
+  │ B1    │ 4 Madre    │ 12 Nodos    │ 1 TBLT       │ 14 - 18 Horas           │
+  │ B2    │ 4 Madre    │ 12 Nodos    │ 1 TBLT       │ 16 - 22 Horas           │
+  │ C1    │ 4 Madre    │ 12 Nodos    │ 1 TBLT       │ 20 - 26 Horas           │
+  │ C2    │ 4 Madre    │ 12 Nodos    │ 1 TBLT       │ 22 - 30 Horas           │
+  ├───────┼────────────┼─────────────┼──────────────┼─────────────────────────┤
+  │ TOTAL │ 24 Madre   │ 72+ Nodos   │ 6 TBLT       │ ~90 - 120 Horas Totales │
+  └───────┴────────────┴─────────────┴──────────────┴─────────────────────────┘
+
+C. PLAN DIARIO DE ESTUDIO (FLUENTIA 45 MINUTOS):
+  - Bloque 1 (15 min): Inmersión Sonora Auténtica (i + 1) sin traducción.
+  - Bloque 2 (15 min): Shadowing neuromuscular y fonética con Web Speech API.
+  - Bloque 3 (15 min): Monitor tardío, repaso SRS y producción en el taller TBLT.
+
+
+--------------------------------------------------------------------------------
+7. GAMIFICACIÓN, SISTEMA DE XP Y CONDICIONES DE PROGRESO
+--------------------------------------------------------------------------------
+• Lección Troncal completada: +35 a +50 XP.
+• Cada Sub-nodo completado (Reading, Listening, SRS): +15 a +25 XP.
+• Proyecto Académico TBLT calificado: +75 a +100 XP + Aumento en habilidad Writing.
+• Misiones Diarias (3 por día): +20 XP por misión + Bono de +50 XP al hacer las 3.
+• Placement Test completado: +150 XP de bienvenida.
+• Desbloqueo del siguiente nodo: Condicionado a completar el nodo anterior y
+  repasar sus correspondientes sub-nodos para fijación sináptica.
+
+
+--------------------------------------------------------------------------------
+8. DIAGNÓSTICO ESTRATÉGICO Y PLAN DE MEJORAS RECOMENDADAS
+--------------------------------------------------------------------------------
+
+FORTALEZAS ACTUALES:
+  1. Enfoque científico riguroso (SLA Krashen + Rúbricas Oxford/Cambridge).
+  2. Interfaz visual moderna, inmersiva, con soporte nativo de Web Speech API
+     karaoke y evaluación automática con 8 motores de IA.
+  3. Modelo de negocio dual: Freemium local (A1/A2 gratis para tracción) y Paywall
+     con transferencias locales BANPRO (Nicaragua/Centroamérica) + Códigos B2B.
+
+OPORTUNIDADES DE MEJORA IDENTIFICADAS (ROADMAP SUGERIDO):
+
+[A] NIVEL CONTENIDO & CURRÍCULO:
+  1. Expansión de Sub-nodos a B2, C1 y C2:
+     - Los niveles A1, A2 y B1 cuentan con sub-nodos y crónicas extensivas. Conviene
+       completar el banco de sub-nodos con lecturas científicas de Nature/The Economist
+       en B2-C2 para enriquecer la biblioteca global.
+  2. Nuevos Tracks Especializados de Alta Demanda:
+     - "English for Software Engineers & Tech Startups" (Git, PRs, Standups, Demos).
+     - "Medical & Nursing English" (Para profesionales de salud y turismo médico).
+
+[B] NIVEL AUDIO & FONÉTICA:
+  1. Selector de Acento en el Karaoke TTS:
+     - Permitir al alumno elegir entre acento británico (RP), estadounidense (General
+       American) y australiano usando las voces nativas del sistema.
+  2. Grabación y Reproducción Comparativa:
+     - En la etapa de Shadowing, permitir al alumno escuchar su propia voz grabada
+       justo después de la voz del nativo para elevar su auto-corrección.
+
+[C] NIVEL SAAS & COMERCIALIZACIÓN:
+  1. Pasarela de Pago Internacional (Stripe / PayPal / Tarjetas):
+     - Mantener BANPRO para Nicaragua y añadir Stripe/PayPal para cobrar a estudiantes
+       de toda Latinoamérica y España ($29.99 USD o suscripción mensual de $9.99).
+  2. Certificados Académicos Descargables en PDF:
+     - Al completar cada nivel (ej. B2 o Track Call Center), emitir un certificado
+       digital con código QR verificable y nota de rúbrica Oxford.
+  3. Dashboard B2B para Empresas / Universidades:
+     - Una vista especial para gerentes de Call Center donde puedan ver el promedio
+       de notas de sus 50 o 100 colaboradores que usan el código B2B.
+
+================================================================================
+Fin del Documento de Inventario Técnico • Nativa Platform
+================================================================================

@@ -42,7 +42,10 @@ import {
   ShieldCheck,
   Cpu,
   Copy,
-  Sliders
+  Sliders,
+  Crown,
+  Building2,
+  CheckCheck
 } from 'lucide-react';
 import { FluentiaLogo, NativaLogo } from '@/components/fluentia-logo';
 import { APP_NAME } from '@/lib/config';
@@ -55,7 +58,8 @@ import {
   CourseContent,
   getAllLanguages
 } from '@/content/course-content';
-import { AppStorage } from '@/lib/storage';
+import { AppStorage, PaymentRequest, LicenseCode } from '@/lib/storage';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { soundManager } from '@/lib/sound-effects';
 import {
   LEVELS_CONFIG,
@@ -87,11 +91,53 @@ import {
   PROVIDER_INFO
 } from '@/lib/ai-config';
 
-type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS' | 'AI_LIBRARY' | 'API_KEYS';
+type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS' | 'AI_LIBRARY' | 'API_KEYS' | 'GLOBAL_CONFIG';
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('CONTENT');
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
+
+  // =========================================================================
+  // FASE 5: CONFIGURACIÓN GLOBAL, PAYWALL, SOLICITUDES Y CÓDIGOS B2B
+  // =========================================================================
+  const [paywallEnabled, setPaywallEnabled] = useState<boolean>(() => AppStorage.getPaywallEnabled());
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>(() => AppStorage.getPaymentRequests());
+  const [licenseCodes, setLicenseCodes] = useState<LicenseCode[]>(() => AppStorage.getLicenseCodes());
+  const [paymentFilter, setPaymentFilter] = useState<'ALL' | 'pending' | 'approved' | 'rejected'>('ALL');
+  const [newCodeInput, setNewCodeInput] = useState('');
+  const [newCodeNote, setNewCodeNote] = useState('');
+  const [newCodeMax, setNewCodeMax] = useState(100);
+  const [copiedCodeNotice, setCopiedCodeNotice] = useState<string | null>(null);
+
+  // =========================================================================
+  // MÉTRICAS REALES PARA ESTADÍSTICAS GLOBALES (SIN DATOS FICTICIOS)
+  // =========================================================================
+  const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
+  const [realCompletedLessons, setRealCompletedLessons] = useState<number>(0);
+  const [realImmersionMinutes, setRealImmersionMinutes] = useState<number>(0);
+  const [realSkillScores, setRealSkillScores] = useState({ listening: 0, reading: 0, speaking: 0, writing: 0 });
+
+  useEffect(() => {
+    setRealCompletedLessons(AppStorage.getCompletedNodes().length);
+    setRealImmersionMinutes(AppStorage.getImmersionMinutes());
+    setRealSkillScores(AppStorage.getSkillScores());
+
+    async function loadRealMetrics() {
+      try {
+        const client = getSupabaseClient();
+        if (client && isSupabaseConfigured) {
+          const { count, error } = await client.from('profiles').select('*', { count: 'exact', head: true });
+          if (!error && count !== null) {
+            setTotalUsersCount(count);
+            return;
+          }
+        }
+      } catch {}
+      const profile = AppStorage.getUserProfile();
+      setTotalUsersCount(profile.email ? 1 : 0);
+    }
+    loadRealMetrics();
+  }, []);
 
   // =========================================================================
   // TIPO DE CURSO: GENERAL (A1-C2) vs ESPECIALIZADO (Call Center, IT, etc.)
@@ -1112,6 +1158,20 @@ export default function AdminDashboardPage() {
             <Key className="w-4 h-4 text-amber-400" />
             <span>Configuración de APIs</span>
           </button>
+
+          <button
+            onClick={() => { 
+              setActiveTab('GLOBAL_CONFIG'); 
+              soundManager.playClick(); 
+            }}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left ${activeTab === 'GLOBAL_CONFIG'
+              ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/10 border border-amber-500/40 text-amber-300 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+          >
+            <Sliders className="w-4 h-4 text-amber-400" />
+            <span>Configuración Global & Paywall</span>
+          </button>
         </nav>
 
         {/* Enlaces Inferiores del Sidebar */}
@@ -1888,17 +1948,19 @@ export default function AdminDashboardPage() {
                   <span>Usuarios Totales</span>
                   <Users className="w-4 h-4 text-emerald-400" />
                 </div>
-                <div className="text-2xl font-black text-white">1,420</div>
-                <span className="text-[10px] font-mono text-emerald-400 font-bold block">+18 esta semana</span>
+                <div className="text-2xl font-black text-white">{totalUsersCount}</div>
+                <span className="text-[10px] font-mono text-emerald-400 font-bold block">
+                  {isSupabaseConfigured ? 'Registros en Supabase' : 'Almacenamiento Local'}
+                </span>
               </div>
 
               <div className="p-5 rounded-3xl bg-[#090d16] border border-slate-800/90 space-y-2">
                 <div className="flex items-center justify-between text-slate-400 text-xs">
-                  <span>Lecciones Hoy</span>
+                  <span>Lecciones Completadas</span>
                   <CheckCircle2 className="w-4 h-4 text-teal-400" />
                 </div>
-                <div className="text-2xl font-black text-white">42</div>
-                <span className="text-[10px] font-mono text-teal-400 font-bold block">100% filtro zen</span>
+                <div className="text-2xl font-black text-white">{realCompletedLessons}</div>
+                <span className="text-[10px] font-mono text-teal-400 font-bold block">Nodos completados</span>
               </div>
 
               <div className="p-5 rounded-3xl bg-[#090d16] border border-slate-800/90 space-y-2">
@@ -1906,7 +1968,7 @@ export default function AdminDashboardPage() {
                   <span>Minutos Inmersión</span>
                   <Clock className="w-4 h-4 text-cyan-400" />
                 </div>
-                <div className="text-2xl font-black text-white">6,240m</div>
+                <div className="text-2xl font-black text-white">{realImmersionMinutes}m</div>
                 <span className="text-[10px] font-mono text-cyan-400 font-bold block">Narrow Reading & Audio</span>
               </div>
 
@@ -1944,40 +2006,40 @@ export default function AdminDashboardPage() {
                 <div>
                   <div className="flex justify-between pb-1 font-mono text-[11px] text-slate-400">
                     <span>Listening (Inmersión Receptiva)</span>
-                    <span className="text-cyan-400 font-bold">35%</span>
+                    <span className="text-cyan-400 font-bold">{realSkillScores.listening}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-cyan-400 rounded-full" style={{ width: '35%' }} />
+                    <div className="h-full bg-cyan-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, realSkillScores.listening)}%` }} />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex justify-between pb-1 font-mono text-[11px] text-slate-400">
                     <span>Reading (Narrow Reading & Glosario)</span>
-                    <span className="text-emerald-400 font-bold">30%</span>
+                    <span className="text-emerald-400 font-bold">{realSkillScores.reading}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-emerald-400 rounded-full" style={{ width: '30%' }} />
+                    <div className="h-full bg-emerald-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, realSkillScores.reading)}%` }} />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex justify-between pb-1 font-mono text-[11px] text-slate-400">
                     <span>Speaking (Shadowing & Fonética)</span>
-                    <span className="text-teal-400 font-bold">20%</span>
+                    <span className="text-teal-400 font-bold">{realSkillScores.speaking}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-teal-400 rounded-full" style={{ width: '20%' }} />
+                    <div className="h-full bg-teal-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, realSkillScores.speaking)}%` }} />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex justify-between pb-1 font-mono text-[11px] text-slate-400">
                     <span>Writing (Taller & Proyectos TBLT)</span>
-                    <span className="text-purple-400 font-bold">15%</span>
+                    <span className="text-purple-400 font-bold">{realSkillScores.writing}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-purple-400 rounded-full" style={{ width: '15%' }} />
+                    <div className="h-full bg-purple-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, realSkillScores.writing)}%` }} />
                   </div>
                 </div>
               </div>
@@ -2794,6 +2856,412 @@ export default function AdminDashboardPage() {
                     <span>Guardar Toda la Configuración</span>
                   </button>
                 </div>
+              </div>
+
+            </div>
+          );
+        })()}
+
+        {/* ===================================================================
+            7. PESTAÑA: CONFIGURACIÓN GLOBAL, PAYWALL Y LICENCIAS B2B (FASE 5)
+        =================================================================== */}
+        {activeTab === 'GLOBAL_CONFIG' && (() => {
+          const filteredRequests = paymentRequests.filter(req => {
+            if (paymentFilter === 'ALL') return true;
+            return req.status === paymentFilter;
+          });
+
+          const pendingCount = paymentRequests.filter(r => r.status === 'pending').length;
+          const approvedCount = paymentRequests.filter(r => r.status === 'approved').length;
+          const rejectedCount = paymentRequests.filter(r => r.status === 'rejected').length;
+
+          const handleTogglePaywall = () => {
+            const next = !paywallEnabled;
+            setPaywallEnabled(next);
+            AppStorage.setPaywallEnabled(next);
+            soundManager.playClick();
+            setSaveSuccessNotice(next ? '✓ PAYWALL_ENABLED = ON (Niveles B1-C2 y Call Center bloqueados)' : '✓ PAYWALL_ENABLED = OFF (Modo de pruebas sin bloqueos)');
+            setTimeout(() => setSaveSuccessNotice(null), 3500);
+          };
+
+          const handleApprovePayment = (id: string) => {
+            AppStorage.approvePaymentRequest(id);
+            setPaymentRequests(AppStorage.getPaymentRequests());
+            soundManager.playLevelUp();
+            setSaveSuccessNotice('✓ Pago aprobado: Alumno elevado a estado Premium automáticamente.');
+            setTimeout(() => setSaveSuccessNotice(null), 3500);
+          };
+
+          const handleRejectPayment = (id: string) => {
+            AppStorage.rejectPaymentRequest(id);
+            setPaymentRequests(AppStorage.getPaymentRequests());
+            soundManager.playWrong();
+            setSaveSuccessNotice('Solicitud de pago marcada como rechazada.');
+            setTimeout(() => setSaveSuccessNotice(null), 3500);
+          };
+
+          const handleCreateLicense = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!newCodeInput.trim()) return;
+            const created = AppStorage.generateLicenseCode(newCodeInput, newCodeNote, newCodeMax || 100);
+            setLicenseCodes(AppStorage.getLicenseCodes());
+            setNewCodeInput('');
+            setNewCodeNote('');
+            soundManager.playVictory();
+            setSaveSuccessNotice(`✓ Código de licencia ${created.code} generado con éxito.`);
+            setTimeout(() => setSaveSuccessNotice(null), 3500);
+          };
+
+          const handleToggleLicense = (code: string) => {
+            AppStorage.toggleLicenseCode(code);
+            setLicenseCodes(AppStorage.getLicenseCodes());
+            soundManager.playClick();
+          };
+
+          const handleCopy = (text: string) => {
+            navigator.clipboard.writeText(text);
+            setCopiedCodeNotice(text);
+            soundManager.playClick();
+            setTimeout(() => setCopiedCodeNotice(null), 2000);
+          };
+
+          return (
+            <div className="p-6 md:p-8 space-y-8">
+              
+              {/* Cabecera de Configuración Global */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-5 h-5 text-amber-400" />
+                    <h2 className="text-xl font-black text-white tracking-tight">
+                      Configuración Global y Paywall Comercial
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Controla el acceso al modelo SaaS de Nativa, aprueba transferencias locales BANPRO y emite licencias B2B.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+                    Estado Actual: {paywallEnabled ? <span className="text-amber-400 font-bold">PAYWALL ON</span> : <span className="text-emerald-400 font-bold">PAYWALL OFF (Dev)</span>}
+                  </span>
+                </div>
+              </div>
+
+              {/* SECCIÓN 1: INTERRUPTOR MAESTRO PAYWALL_ENABLED */}
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-[#0c1424] to-[#080d18] border-2 border-amber-500/40 shadow-xl space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-5 h-5 text-amber-400" />
+                      <span className="text-sm font-black text-white uppercase tracking-wider font-mono">
+                        Interruptor Maestro: PAYWALL_ENABLED
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                      Cuando está en <strong className="text-emerald-400">OFF (Desactivado)</strong>, puedes navegar, probar y verificar todos los niveles (A1-C2) y el Track de Call Center sin interrupciones. Cuando se activa en <strong className="text-amber-400">ON</strong>, el sistema bloquea B1-C2 y Call Center exigiendo Nativa Premium.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleTogglePaywall}
+                    className={`px-5 py-3 rounded-2xl font-black text-xs transition flex items-center gap-3 cursor-pointer shrink-0 shadow-lg ${
+                      paywallEnabled
+                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/25 ring-2 ring-amber-300'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    {paywallEnabled ? (
+                      <>
+                        <ToggleRight className="w-6 h-6 text-slate-950" />
+                        <span>PAYWALL ACTIVO (ON)</span>
+                      </>
+                    ) : (
+                      <>
+                        <ToggleLeft className="w-6 h-6 text-slate-400" />
+                        <span>MODO PRUEBAS (OFF)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+                  <div className="p-3 rounded-xl bg-black/40 border border-slate-800 space-y-1">
+                    <span className="font-bold text-white block">Acceso Gratuito (Freemium):</span>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Niveles A1 y A2 (18 lecciones completas + vocabulario básico) siempre libres para atraer nuevos alumnos.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-black/40 border border-slate-800 space-y-1">
+                    <span className="font-bold text-amber-300 block">Acceso Restringido (Premium):</span>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Niveles B1, B2, C1, C2 y Track Call Center BPO bloqueados si PAYWALL_ENABLED = ON y el alumno no es Premium.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECCIÓN 2: SOLICITUDES DE PAGO (TRANSFERENCIAS LOCALES BANPRO) */}
+              <div className="p-6 rounded-3xl bg-[#090e1a] border border-slate-800 space-y-5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-emerald-400" />
+                      <h3 className="text-base font-bold text-white">
+                        Solicitudes de Pago (Transferencias BANPRO / Locales)
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Comprobantes y minutas enviadas por los alumnos. Al presionar "Aprobar", la cuenta del estudiante pasa a Premium.
+                    </p>
+                  </div>
+
+                  {/* Filtros de Solicitudes */}
+                  <div className="flex items-center gap-1.5 p-1 bg-[#05080f] rounded-xl border border-slate-800 text-xs">
+                    <button
+                      onClick={() => setPaymentFilter('ALL')}
+                      className={`px-3 py-1 rounded-lg font-bold transition ${paymentFilter === 'ALL' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      Todas ({paymentRequests.length})
+                    </button>
+                    <button
+                      onClick={() => setPaymentFilter('pending')}
+                      className={`px-3 py-1 rounded-lg font-bold transition ${paymentFilter === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'text-slate-400 hover:text-amber-300'}`}
+                    >
+                      Pendientes ({pendingCount})
+                    </button>
+                    <button
+                      onClick={() => setPaymentFilter('approved')}
+                      className={`px-3 py-1 rounded-lg font-bold transition ${paymentFilter === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-emerald-300'}`}
+                    >
+                      Aprobadas ({approvedCount})
+                    </button>
+                  </div>
+                </div>
+
+                {filteredRequests.length === 0 ? (
+                  <div className="p-8 text-center rounded-2xl bg-[#05080f] border border-slate-800/80 space-y-2">
+                    <CheckCircle2 className="w-8 h-8 text-slate-600 mx-auto" />
+                    <p className="text-xs text-slate-400">
+                      No hay solicitudes registradas con el filtro actual.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredRequests.map((req) => (
+                      <div
+                        key={req.id}
+                        className="p-4 rounded-2xl bg-[#060a12] border border-slate-800 hover:border-slate-700 transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-white">{req.userName}</span>
+                            <span className="text-[11px] text-slate-400 font-mono">({req.userEmail || req.userId})</span>
+                            <span className={`text-[10px] font-mono uppercase font-black px-2 py-0.5 rounded-full border ${
+                              req.status === 'approved'
+                                ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'
+                                : req.status === 'rejected'
+                                ? 'bg-rose-950/80 border-rose-500/40 text-rose-300'
+                                : 'bg-amber-950/80 border-amber-500/40 text-amber-300 animate-pulse'
+                            }`}>
+                              {req.status === 'approved' ? '✓ Aprobado' : req.status === 'rejected' ? 'Rechazado' : 'Pendiente de Revisión'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-xs text-slate-400 font-mono flex-wrap">
+                            <span>Banco: <strong className="text-slate-200">{req.bankName}</strong></span>
+                            <span>Monto: <strong className="text-emerald-400">{req.amount}</strong></span>
+                            <span>Fecha: {new Date(req.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+
+                          <div className="pt-1 flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500">Referencia:</span>
+                            <code className="text-xs font-mono font-bold text-amber-300 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded">
+                              {req.referenceNumber}
+                            </code>
+                            <button
+                              onClick={() => handleCopy(req.referenceNumber)}
+                              className="text-slate-500 hover:text-white transition text-xs"
+                              title="Copiar referencia"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            {req.notes && (
+                              <span className="text-[11px] text-slate-400 italic">"{req.notes}"</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Botones de Acción */}
+                        <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                          {req.status === 'pending' ? (
+                            <>
+                              <button
+                                onClick={() => handleApprovePayment(req.id)}
+                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Check className="w-4 h-4" />
+                                <span>Aprobar Pago (Activar Premium)</span>
+                              </button>
+                              <button
+                                onClick={() => handleRejectPayment(req.id)}
+                                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 text-xs font-bold transition cursor-pointer"
+                              >
+                                Rechazar
+                              </button>
+                            </>
+                          ) : req.status === 'approved' ? (
+                            <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
+                              <CheckCheck className="w-4 h-4" />
+                              <span>Premium Acreditado</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-rose-400">Solicitud descartada</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* SECCIÓN 3: GENERADOR Y GESTOR DE CÓDIGOS B2B */}
+              <div className="p-6 rounded-3xl bg-[#090e1a] border border-slate-800 space-y-6 shadow-sm">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Key className="w-4 h-4 text-purple-400" />
+                    <h3 className="text-base font-bold text-white">
+                      Generador de Códigos de Licencia B2B & Convenios
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Genera cupones y licencias corporativas (ej. NATIVA-CALL-2026). Al canjearlos, los alumnos obtienen Premium instantáneo.
+                  </p>
+                </div>
+
+                {/* Formulario de Emisión */}
+                <form onSubmit={handleCreateLicense} className="p-4 rounded-2xl bg-[#060a12] border border-slate-800 space-y-3">
+                  <span className="text-[10px] font-mono text-purple-300 uppercase tracking-wider font-bold block">
+                    Emitir Nuevo Código de Licencia:
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="md:col-span-4">
+                      <input
+                        type="text"
+                        required
+                        placeholder="CÓDIGO (ej: NATIVA-CALL-2026)"
+                        value={newCodeInput}
+                        onChange={(e) => setNewCodeInput(e.target.value.toUpperCase())}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#090e1a] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition font-mono uppercase font-bold"
+                      />
+                    </div>
+                    <div className="md:col-span-5">
+                      <input
+                        type="text"
+                        placeholder="Nota / Convenio (ej: Alianza Call Center BPO)"
+                        value={newCodeNote}
+                        onChange={(e) => setNewCodeNote(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#090e1a] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                      />
+                    </div>
+                    <div className="md:col-span-3 flex gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="10000"
+                        title="Cupo máximo de activaciones"
+                        value={newCodeMax}
+                        onChange={(e) => setNewCodeMax(parseInt(e.target.value, 10) || 100)}
+                        className="w-20 px-3 py-2.5 rounded-xl bg-[#090e1a] border border-slate-800 text-xs text-white text-center font-mono"
+                      />
+                      <button
+                        type="submit"
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition shadow-md shadow-purple-600/20 cursor-pointer"
+                      >
+                        Generar
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                {/* Tabla de Códigos Existentes */}
+                <div className="space-y-2.5">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold block">
+                    Licencias Activas Registradas:
+                  </span>
+                  {licenseCodes.length === 0 ? (
+                    <div className="p-8 text-center rounded-2xl bg-[#060a12] border border-slate-800 space-y-2">
+                      <Key className="w-8 h-8 text-slate-600 mx-auto" />
+                      <p className="text-xs text-slate-400">
+                        Aún no hay códigos de licencia generados. Utiliza el formulario superior para emitir licencias corporativas o convenios B2B.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {licenseCodes.map((lic) => (
+                        <div
+                          key={lic.code}
+                          className="p-4 rounded-2xl bg-[#060a12] border border-slate-800 hover:border-slate-700 transition space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <code className="text-sm font-black font-mono text-purple-300">
+                              {lic.code}
+                            </code>
+                            <button
+                              onClick={() => handleCopy(lic.code)}
+                              className="text-slate-400 hover:text-white transition"
+                              title="Copiar código"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                            {lic.note || 'Licencia B2B'}
+                          </p>
+
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                              <span>Canjes: {lic.currentRedemptions} / {lic.maxRedemptions}</span>
+                              <span className={lic.active ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                                {lic.active ? 'Activa' : 'Inactiva'}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                              <div
+                                className="h-full bg-purple-500 rounded-full"
+                                style={{ width: `${Math.min(100, (lic.currentRedemptions / lic.maxRedemptions) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                            <Link
+                              href={`/admin/company/${encodeURIComponent(lic.code)}`}
+                              className="text-[11px] font-mono text-purple-400 hover:text-purple-300 flex items-center gap-1 font-bold hover:underline"
+                              title="Ver dashboard y colaboradores de esta empresa"
+                            >
+                              <span>Dashboard B2B</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                            <button
+                              onClick={() => handleToggleLicense(lic.code)}
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition ${
+                                lic.active 
+                                  ? 'text-amber-400 hover:bg-amber-950/40' 
+                                  : 'text-emerald-400 hover:bg-emerald-950/40'
+                              }`}
+                            >
+                              {lic.active ? 'Desactivar' : 'Reactivar'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
 
             </div>
