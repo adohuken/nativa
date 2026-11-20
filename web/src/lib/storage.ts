@@ -40,6 +40,24 @@ export interface StarredPhrase {
   addedAt: string;
 }
 
+export type DailyMissionType = 'read_article' | 'complete_srs' | 'shadowing_record';
+
+export interface DailyMission {
+  id: DailyMissionType;
+  title: string;
+  description: string;
+  target: number;
+  progress: number;
+  completed: boolean;
+  xpReward: number;
+}
+
+export interface DailyMissionsState {
+  date: string; // YYYY-MM-DD
+  missions: DailyMission[];
+  allCompletedBonusClaimed: boolean;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -96,6 +114,9 @@ const KEYS = {
   COMPLETED_SUBNODES: 'fluentia_completed_subnodes',
   CUSTOM_COURSE_CONTENT: 'fluentia_custom_course_content',
   CUSTOM_LANGUAGES_REGISTRY: 'fluentia_custom_languages_registry',
+  DAILY_MISSIONS: 'fluentia_daily_missions',
+  CUSTOM_LIBRARY_ITEMS: 'fluentia_custom_library_items',
+  COMPLETED_LIBRARY_ITEMS: 'fluentia_completed_library_items',
 };
 
 function getLangKey(baseKey: string, lang: string = 'english'): string {
@@ -426,6 +447,168 @@ export const AppStorage = {
     try {
       localStorage.setItem(KEYS.USER_CREDENTIALS, newPassword);
     } catch {}
+  },
+
+  // =========================================================================
+  // MISIONES DIARIAS (GAMIFICACIÓN INTELIGENTE)
+  // =========================================================================
+  getTodayDateString(): string {
+    return new Date().toISOString().split('T')[0];
+  },
+
+  getDailyMissions(): DailyMissionsState {
+    const today = this.getTodayDateString();
+    const defaultMissions: DailyMission[] = [
+      {
+        id: 'read_article',
+        title: 'Leer 1 artículo de la biblioteca',
+        description: 'Explora y lee 1 texto o audio en la Biblioteca de Inmersión',
+        target: 1,
+        progress: 0,
+        completed: false,
+        xpReward: 20
+      },
+      {
+        id: 'complete_srs',
+        title: 'Completar 1 sesión de SRS (Repaso)',
+        description: 'Repasa tus tarjetas de repetición espaciada para fijar léxico',
+        target: 1,
+        progress: 0,
+        completed: false,
+        xpReward: 20
+      },
+      {
+        id: 'shadowing_record',
+        title: 'Grabar 1 respuesta oral en Shadowing',
+        description: 'Practica tu fonética con el micrófono en la etapa de Shadowing',
+        target: 1,
+        progress: 0,
+        completed: false,
+        xpReward: 20
+      }
+    ];
+
+    if (typeof window === 'undefined') {
+      return { date: today, missions: defaultMissions, allCompletedBonusClaimed: false };
+    }
+
+    try {
+      const data = localStorage.getItem(KEYS.DAILY_MISSIONS);
+      if (data) {
+        const parsed: DailyMissionsState = JSON.parse(data);
+        if (parsed.date === today && Array.isArray(parsed.missions) && parsed.missions.length === 3) {
+          return parsed;
+        }
+      }
+    } catch {}
+
+    const freshState: DailyMissionsState = {
+      date: today,
+      missions: defaultMissions,
+      allCompletedBonusClaimed: false
+    };
+    this.saveDailyMissions(freshState);
+    return freshState;
+  },
+
+  saveDailyMissions(state: DailyMissionsState): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(KEYS.DAILY_MISSIONS, JSON.stringify(state));
+    } catch {}
+  },
+
+  updateDailyMissionProgress(
+    missionId: DailyMissionType, 
+    amount: number = 1
+  ): { state: DailyMissionsState; newlyCompleted: boolean; bonusGranted: boolean } {
+    const state = this.getDailyMissions();
+    let newlyCompleted = false;
+    let bonusGranted = false;
+
+    state.missions = state.missions.map(m => {
+      if (m.id === missionId && !m.completed) {
+        const nextProgress = Math.min(m.target, m.progress + amount);
+        const isDone = nextProgress >= m.target;
+        if (isDone && !m.completed) {
+          newlyCompleted = true;
+          // Sumar XP de misión individual
+          const currentXp = this.getXp();
+          this.saveXp(currentXp + m.xpReward);
+        }
+        return {
+          ...m,
+          progress: nextProgress,
+          completed: isDone
+        };
+      }
+      return m;
+    });
+
+    // Verificar si las 3 misiones están completadas
+    const allDone = state.missions.every(m => m.completed);
+    if (allDone && !state.allCompletedBonusClaimed) {
+      state.allCompletedBonusClaimed = true;
+      bonusGranted = true;
+      // Bonus especial de +50 XP al completar las 3 del día
+      const currentXp = this.getXp();
+      this.saveXp(currentXp + 50);
+    }
+
+    this.saveDailyMissions(state);
+    return { state, newlyCompleted, bonusGranted };
+  },
+
+  // =========================================================================
+  // BIBLIOTECA EXTENSIVA Y CONTENIDO PERSONALIZADO GUARDADO
+  // =========================================================================
+  saveCustomLibraryItem(item: any): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const items = this.getCustomLibraryItems();
+      const updated = [item, ...items.filter((i: any) => i.id !== item.id)];
+      localStorage.setItem(KEYS.CUSTOM_LIBRARY_ITEMS, JSON.stringify(updated));
+    } catch {}
+  },
+
+  getCustomLibraryItems(lessonId?: string): any[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem(KEYS.CUSTOM_LIBRARY_ITEMS);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          if (lessonId) {
+            return parsed.filter((i: any) => i.lessonId === lessonId);
+          }
+          return parsed;
+        }
+      }
+    } catch {}
+    return [];
+  },
+
+  markLibraryItemCompleted(itemId: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const list = this.getCompletedLibraryItemIds();
+      if (!list.includes(itemId)) {
+        list.push(itemId);
+        localStorage.setItem(KEYS.COMPLETED_LIBRARY_ITEMS, JSON.stringify(list));
+      }
+    } catch {}
+  },
+
+  getCompletedLibraryItemIds(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem(KEYS.COMPLETED_LIBRARY_ITEMS);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
   },
 
   resetAll(): void {

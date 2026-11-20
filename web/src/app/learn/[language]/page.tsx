@@ -76,6 +76,8 @@ import { IMMERSION_STORIES, ImmersionStory } from '@/lib/immersion-data';
 import { FluentiaLogo, FluentiaGlyph } from '@/components/fluentia-logo';
 import { SubNode, getSubNodesForLesson, getSubNodeById, getLanguageEntry } from '@/content/course-content';
 import { ImmersionViewerModal } from '@/components/immersion-viewer-modal';
+import { TopicLibraryModal } from '@/components/topic-library-modal';
+import { DailyMissionsWidget } from '@/components/daily-missions-widget';
 import { RadarSkillsChart } from '@/components/radar-skills-chart';
 import { UserProfileModal } from '@/components/user-profile-modal';
 import { APP_NAME } from '@/lib/config';
@@ -291,6 +293,8 @@ function FluentiaPathContent() {
   const [completedSubNodeIds, setCompletedSubNodeIds] = useState<string[]>([]);
   const [activeSubNode, setActiveSubNode] = useState<SubNode | null>(null);
   const [activeLesson, setActiveLesson] = useState<IntensiveLesson | null>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [selectedLibraryLesson, setSelectedLibraryLesson] = useState<{ id: string; code: string; title: string; level: string } | null>(null);
   const [activePopoverLessonId, setActivePopoverLessonId] = useState<string | null>(null);
   const [hoveredLessonId, setHoveredLessonId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<number>(1); // 1 a 6 pasos
@@ -1797,6 +1801,25 @@ function FluentiaPathContent() {
                                 </div>
                               )}
                             </div>
+
+                            {/* Botón Acceso a la Biblioteca de Inmersión del Tema */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActivePopoverLessonId(null);
+                                setSelectedLibraryLesson({ id: lesson.id, code: lesson.code, title: lesson.title, level: lesson.level });
+                                setIsLibraryOpen(true);
+                                soundManager.playClick();
+                              }}
+                              className="w-full mt-2 py-2 px-3 rounded-xl bg-[#080d16] hover:bg-[#0f1728] border border-slate-700/80 hover:border-emerald-500/50 text-emerald-300 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm group"
+                              title="Ver textos, audios y casos adicionales de este tema"
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+                              <span>Ir a la Biblioteca de este Tema</span>
+                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-1.5 py-0.2 rounded-full ml-1">
+                                +Input
+                              </span>
+                            </button>
 
                             {/* Flecha indicadora apuntando al círculo */}
                             <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-[#0c1322]" />
@@ -4176,6 +4199,19 @@ function FluentiaPathContent() {
         streakDays={streakDays}
         userXp={userXp}
         immersionMinutes={immersionMinutes}
+      />
+
+      {/* Modal de la Biblioteca de Inmersión y Content Lake */}
+      <TopicLibraryModal
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        lessonId={selectedLibraryLesson?.id || activeLesson?.id || 'a1-lesson-1'}
+        lessonCode={selectedLibraryLesson?.code || activeLesson?.code || '1.1'}
+        lessonTitle={selectedLibraryLesson?.title || activeLesson?.title || 'Tema de Inmersión'}
+        level={selectedLibraryLesson?.level || activeLesson?.level || 'A1'}
+        onMinutesAdded={(mins) => {
+          setImmersionMinutes((prev) => prev + mins);
+        }}
       />
 
     </div>

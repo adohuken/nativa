@@ -31,6 +31,7 @@ import { LANGUAGES_REGISTRY, LanguageHubEntry, getAllLanguages } from '@/content
 import { AppStorage, UserProfile } from '@/lib/storage';
 import { soundManager } from '@/lib/sound-effects';
 import { UserProfileModal } from '@/components/user-profile-modal';
+import { DailyMissionsWidget } from '@/components/daily-missions-widget';
 import { APP_NAME } from '@/lib/config';
 
 export default function FluentiaDashboardPage() {
@@ -206,6 +207,18 @@ export default function FluentiaDashboardPage() {
               </Link>
             </div>
           </div>
+        </section>
+
+        {/* =====================================================================
+            MISIONES DIARIAS (GAMIFICACIÓN Y ADQUISICIÓN DIARIA)
+        ===================================================================== */}
+        <section className="space-y-3">
+          <DailyMissionsWidget
+            onActionClick={() => {
+              soundManager.playClick();
+              window.location.href = '/learn/english';
+            }}
+          />
         </section>
 
         {/* =====================================================================

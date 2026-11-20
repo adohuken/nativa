@@ -66,8 +66,14 @@ import {
   CourseType,
   DEFAULT_SPECIALIZED_TRACKS
 } from '@/lib/specialized-tracks';
+import {
+  GlobalStoriesService,
+  GlobalStory,
+  CEFRLevel,
+  POPULAR_TOPICS
+} from '@/lib/global-stories';
 
-type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS';
+type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS' | 'AI_LIBRARY';
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('CONTENT');
@@ -141,6 +147,48 @@ export default function AdminDashboardPage() {
   const [aiGeneratedPreview, setAiGeneratedPreview] = useState<string | null>(null);
 
   // =========================================================================
+  // BIBLIOTECA GLOBAL IA (CONTENT LAKE STATE)
+  // =========================================================================
+  const [globalStoriesList, setGlobalStoriesList] = useState<GlobalStory[]>([]);
+  const [storyFilterLevel, setStoryFilterLevel] = useState<string>('ALL');
+  const [storyFilterTopic, setStoryFilterTopic] = useState<string>('ALL');
+  const [storySearchTerm, setStorySearchTerm] = useState<string>('');
+  const [readingStoryModal, setReadingStoryModal] = useState<GlobalStory | null>(null);
+  const [lakeStats, setLakeStats] = useState({
+    totalStories: 0,
+    totalReads: 0,
+    estimatedTokensSaved: 0,
+    topicsCount: 0,
+    levelsBreakdown: {} as Record<string, number>
+  });
+
+  const refreshLakeStories = () => {
+    GlobalStoriesService.init();
+    const list = GlobalStoriesService.getAllStories();
+    setGlobalStoriesList(list);
+    setLakeStats(GlobalStoriesService.getLakeStats());
+  };
+
+  const handleDeleteStory = (storyId: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar esta historia del Banco Global? Esta acción es irreversible.')) {
+      GlobalStoriesService.deleteStory(storyId);
+      refreshLakeStories();
+      soundManager.playClick();
+      setSaveSuccessNotice('✓ Historia eliminada del Banco Global');
+      setTimeout(() => setSaveSuccessNotice(null), 3500);
+    }
+  };
+
+  const handleToggleStoryStatus = (storyId: string, currentStatus: 'approved' | 'rejected') => {
+    const nextStatus = currentStatus === 'approved' ? 'rejected' : 'approved';
+    GlobalStoriesService.updateStoryStatus(storyId, nextStatus);
+    refreshLakeStories();
+    soundManager.playClick();
+    setSaveSuccessNotice(`✓ Estado de la historia actualizado a: ${nextStatus.toUpperCase()}`);
+    setTimeout(() => setSaveSuccessNotice(null), 3500);
+  };
+
+  // =========================================================================
   // CARGA INICIAL DE DATOS
   // =========================================================================
   useEffect(() => {
@@ -149,6 +197,8 @@ export default function AdminDashboardPage() {
 
     const allTracks = getAllSpecializedTracks();
     setSpecializedTracks(allTracks);
+
+    refreshLakeStories();
 
     if (courseType === 'specialized') {
       const trackCourse = getTrackCourseContent(selectedTrackSlug);
@@ -753,6 +803,21 @@ export default function AdminDashboardPage() {
           >
             <Bot className="w-4 h-4 text-purple-400" />
             <span>Generador de IA (SLA)</span>
+          </button>
+
+          <button
+            onClick={() => { 
+              setActiveTab('AI_LIBRARY'); 
+              refreshLakeStories();
+              soundManager.playClick(); 
+            }}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left ${activeTab === 'AI_LIBRARY'
+              ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border border-emerald-500/40 text-emerald-300 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+          >
+            <Database className="w-4 h-4 text-emerald-400" />
+            <span>Biblioteca IA</span>
           </button>
         </nav>
 
@@ -1628,6 +1693,361 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
+        {/* ===================================================================
+            5. PESTAÑA: BIBLIOTECA IA (CONTENT LAKE & GESTIÓN DE HISTORIAS)
+        =================================================================== */}
+        {activeTab === 'AI_LIBRARY' && (
+          <div className="p-6 md:p-8 space-y-6">
+
+            {/* Cabecera */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                    Content Lake • Reutilización Colectiva
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Caché Global Centralizado
+                  </span>
+                </div>
+                <h2 className="text-xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-emerald-400" />
+                  <span>Biblioteca Global de Historias IA</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Banco compartido de narrativas generadas por IA. Cada lectura reutilizada ahorra tokens y reduce el costo de inferencia a cero.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    refreshLakeStories();
+                    soundManager.playClick();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+                  title="Sincronizar e indexar banco global"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Sincronizar Banco</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 TARJETAS DE MÉTRICAS GLOBALES */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800/90 shadow-sm space-y-1">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-mono font-bold uppercase">Historias en Banco</span>
+                  <BookOpen className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {lakeStats.totalStories}
+                </div>
+                <div className="text-[10px] font-mono text-emerald-400">
+                  A1 ({lakeStats.levelsBreakdown?.A1 || 0}) • B1 ({lakeStats.levelsBreakdown?.B1 || 0}) • B2 ({lakeStats.levelsBreakdown?.B2 || 0})
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800/90 shadow-sm space-y-1">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-mono font-bold uppercase">Lecturas Totales</span>
+                  <Users className="w-4 h-4 text-teal-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {lakeStats.totalReads.toLocaleString()}
+                </div>
+                <div className="text-[10px] font-mono text-teal-400">
+                  Exposiciones comprensibles acumuladas
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800/90 shadow-sm space-y-1">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-mono font-bold uppercase">Tokens Ahorrados</span>
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                </div>
+                <div className="text-2xl font-black text-purple-300">
+                  ~{lakeStats.estimatedTokensSaved.toLocaleString()}
+                </div>
+                <div className="text-[10px] font-mono text-purple-400">
+                  Ahorro en inferencia por caché global
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800/90 shadow-sm space-y-1">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[11px] font-mono font-bold uppercase">Temas Cubiertos</span>
+                  <Layers className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {lakeStats.topicsCount}
+                </div>
+                <div className="text-[10px] font-mono text-cyan-400">
+                  Call Center, Tech, Travel, etc.
+                </div>
+              </div>
+            </div>
+
+            {/* BARRA DE FILTROS Y BÚSQUEDA */}
+            <div className="p-4 rounded-2xl bg-[#070b14] border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+                {/* Filtro por Nivel */}
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs font-mono">
+                  <span className="px-2 text-[10px] text-slate-400 font-bold uppercase">Nivel:</span>
+                  {['ALL', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setStoryFilterLevel(lvl)}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition ${
+                        storyFilterLevel === lvl
+                          ? 'bg-emerald-500 text-slate-950'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {lvl === 'ALL' ? 'Todos' : lvl}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filtro por Tema */}
+                <div className="flex items-center gap-1">
+                  <select
+                    value={storyFilterTopic}
+                    onChange={(e) => setStoryFilterTopic(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  >
+                    <option value="ALL">Todos los Temas</option>
+                    {POPULAR_TOPICS.map((top) => (
+                      <option key={top} value={top}>{top}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Búsqueda por texto */}
+              <div className="w-full md:w-72 relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar por título o contenido..."
+                  value={storySearchTerm}
+                  onChange={(e) => setStorySearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500 placeholder:text-slate-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* TABLA / GRILLA DE HISTORIAS */}
+            {(() => {
+              const filtered = GlobalStoriesService.getStoriesFiltered({
+                level: storyFilterLevel,
+                topic: storyFilterTopic,
+                searchTerm: storySearchTerm
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="p-12 text-center rounded-2xl bg-[#090d16] border border-slate-800 text-slate-500 text-xs space-y-2">
+                    <Database className="w-8 h-8 mx-auto text-slate-600" />
+                    <p className="font-bold text-slate-400">No se encontraron historias con los filtros seleccionados.</p>
+                    <p>Prueba seleccionando otro Nivel o limpiando el campo de búsqueda.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  <div className="text-xs font-mono text-slate-400 px-1">
+                    Mostrando <strong className="text-white">{filtered.length}</strong> historias del banco global:
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {filtered.map((story) => (
+                      <div
+                        key={story.id}
+                        className="p-4 rounded-2xl bg-[#090e1a] border border-slate-800/90 hover:border-slate-700 transition flex flex-col justify-between gap-3 shadow-sm relative group"
+                      >
+                        {/* Cabecera de Tarjeta */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded font-bold">
+                                {story.level}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-300 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded font-bold">
+                                {story.topic}
+                              </span>
+                            </div>
+
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                              story.status === 'approved'
+                                ? 'bg-emerald-950/80 border border-emerald-500/40 text-emerald-300'
+                                : 'bg-rose-950/80 border border-rose-500/40 text-rose-300'
+                            }`}>
+                              {story.status === 'approved' ? '✓ Aprobada' : '✕ Oculta'}
+                            </span>
+                          </div>
+
+                          <h3 className="text-sm font-bold text-white line-clamp-1 leading-snug">
+                            {story.title}
+                          </h3>
+
+                          <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+                            {story.paragraphs?.[0] || story.content}
+                          </p>
+                        </div>
+
+                        {/* Metadatos y Acciones */}
+                        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 font-mono text-[11px] text-teal-300 font-bold">
+                            <span>📖 {story.times_read} lecturas</span>
+                            <span>•</span>
+                            <span className="text-slate-500 font-normal">{story.word_count} palabras</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {/* Botón Leer */}
+                            <button
+                              onClick={() => {
+                                setReadingStoryModal(story);
+                                soundManager.playClick();
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs transition cursor-pointer"
+                              title="Leer historia completa"
+                            >
+                              Leer
+                            </button>
+
+                            {/* Botón Cambiar Estado */}
+                            <button
+                              onClick={() => handleToggleStoryStatus(story.id, story.status)}
+                              className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                              title={story.status === 'approved' ? 'Ocultar historia' : 'Aprobar historia'}
+                            >
+                              {story.status === 'approved' ? (
+                                <ToggleRight className="w-4 h-4 text-emerald-400" />
+                              ) : (
+                                <ToggleLeft className="w-4 h-4 text-rose-400" />
+                              )}
+                            </button>
+
+                            {/* Botón Eliminar */}
+                            <button
+                              onClick={() => handleDeleteStory(story.id)}
+                              className="p-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-rose-400 hover:text-rose-200 transition cursor-pointer"
+                              title="Eliminar si la IA alucinó o tiene errores"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+          </div>
+        )}
+
+        {/* MODAL DE LECTURA Y REVISIÓN PARA EL ADMINISTRADOR */}
+        <AnimatePresence>
+          {readingStoryModal && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full max-w-2xl bg-[#090d16] border border-slate-700 rounded-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded font-bold">
+                      {readingStoryModal.level}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-300 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded font-bold">
+                      {readingStoryModal.topic}
+                    </span>
+                    <span className="text-[10px] font-mono text-teal-300 font-bold">
+                      📖 {readingStoryModal.times_read} lecturas
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setReadingStoryModal(null)}
+                    className="text-slate-400 hover:text-white text-xs font-mono cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <h2 className="text-lg font-black text-white">
+                    {readingStoryModal.title}
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    {readingStoryModal.subtitle}
+                  </p>
+                </div>
+
+                {/* Párrafos */}
+                <div className="space-y-3 font-sans leading-relaxed text-sm text-slate-200 bg-[#060911] p-4 rounded-2xl border border-slate-800">
+                  {readingStoryModal.paragraphs.map((p, idx) => (
+                    <p key={idx}>{p}</p>
+                  ))}
+                </div>
+
+                {/* Vocabulario */}
+                {readingStoryModal.vocabulary && Object.keys(readingStoryModal.vocabulary).length > 0 && (
+                  <div className="p-3 rounded-2xl bg-[#0b101c] border border-slate-800 space-y-1.5 text-xs">
+                    <strong className="text-[10px] font-mono text-slate-400 uppercase font-bold block">
+                      Vocabulario Introducido:
+                    </strong>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(readingStoryModal.vocabulary).map(([k, v]) => (
+                        <span key={k} className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+                          <strong className="text-teal-300">{k}:</strong> {v}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Insight */}
+                {readingStoryModal.cultural_insight && (
+                  <div className="p-3 rounded-2xl bg-teal-950/20 border border-teal-500/30 text-xs text-slate-300 space-y-1">
+                    <strong className="text-[10px] font-mono text-teal-300 uppercase font-bold block">
+                      💡 Insight Pragmático:
+                    </strong>
+                    <p>{readingStoryModal.cultural_insight}</p>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      handleDeleteStory(readingStoryModal.id);
+                      setReadingStoryModal(null);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Historia</span>
+                  </button>
+
+                  <button
+                    onClick={() => setReadingStoryModal(null)}
+                    className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold cursor-pointer"
+                  >
+                    Cerrar Vista Previa
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* =====================================================================
