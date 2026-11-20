@@ -35,10 +35,13 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/public ./web/public 2>/dev/null || true
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./web/.next/static 2>/dev/null || true
+
+RUN mkdir -p web/.next && \
+    cp -rn public web/ 2>/dev/null || true && \
+    cp -rn .next/static web/.next/ 2>/dev/null || true && \
+    chown -R nextjs:nodejs /app
 
 USER nextjs
 
