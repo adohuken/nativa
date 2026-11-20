@@ -24,7 +24,7 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build
+RUN npm run build -- --webpack
 
 # Etapa final liviana de ejecución
 FROM node:20-alpine AS runner
@@ -38,13 +38,15 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copiar archivos públicos y la build standalone de Next.js
+# Copiar archivos públicos y estáticos (CSS, JS, Fonts) en todas las rutas posibles
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/public ./web/public 2>/dev/null || true
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./web/.next/static 2>/dev/null || true
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "if [ -f server.js ]; then node server.js; elif [ -f web/server.js ]; then node web/server.js; else npm start; fi"]
