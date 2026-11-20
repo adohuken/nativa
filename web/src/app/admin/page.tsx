@@ -209,6 +209,11 @@ export default function AdminDashboardPage() {
   const [showKeys, setShowKeys] = useState<Record<AiProvider, boolean>>({
     gemini: false,
     groq: false,
+    cerebras: false,
+    openrouter: false,
+    mistral: false,
+    cohere: false,
+    cloudflare: false,
     openai: false,
     deepseek: false,
     elevenlabs: false
@@ -217,6 +222,11 @@ export default function AdminDashboardPage() {
   const [testResults, setTestResults] = useState<Record<AiProvider, { success: boolean; message: string; latencyMs: number } | null>>({
     gemini: null,
     groq: null,
+    cerebras: null,
+    openrouter: null,
+    mistral: null,
+    cohere: null,
+    cloudflare: null,
     openai: null,
     deepseek: null,
     elevenlabs: null
@@ -235,7 +245,7 @@ export default function AdminDashboardPage() {
       providers: {
         ...prev.providers,
         [provider]: {
-          ...prev.providers[provider],
+          ...(prev.providers[provider] || { model: '', isActive: true }),
           key: newKey,
           testStatus: 'untested'
         }
@@ -249,7 +259,7 @@ export default function AdminDashboardPage() {
       providers: {
         ...prev.providers,
         [provider]: {
-          ...prev.providers[provider],
+          ...(prev.providers[provider] || { key: '', isActive: true }),
           model: newModel
         }
       }
@@ -2308,7 +2318,12 @@ export default function AdminDashboardPage() {
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
                   >
                     <option value="gemini">Google Gemini (Recomendado)</option>
-                    <option value="groq">Groq Cloud (Velocidad Extrema)</option>
+                    <option value="groq">Groq Cloud (500+ tokens/s)</option>
+                    <option value="cerebras">Cerebras (2,000+ tokens/s)</option>
+                    <option value="openrouter">OpenRouter (Hub 200+ Modelos)</option>
+                    <option value="mistral">Mistral AI (Multilingüe Europeo)</option>
+                    <option value="cohere">Cohere (Command R+)</option>
+                    <option value="cloudflare">Cloudflare Workers AI (Edge)</option>
                     <option value="openai">OpenAI (GPT-4o Mini)</option>
                     <option value="deepseek">DeepSeek AI (Bajo Costo)</option>
                   </select>
@@ -2325,6 +2340,11 @@ export default function AdminDashboardPage() {
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
                   >
                     <option value="groq">Groq Cloud (Llama 3.3 70B)</option>
+                    <option value="cerebras">Cerebras (Hiper-Velocidad)</option>
+                    <option value="openrouter">OpenRouter (Respaldo Universal)</option>
+                    <option value="mistral">Mistral AI (Mistral Small)</option>
+                    <option value="cohere">Cohere (Command R)</option>
+                    <option value="cloudflare">Cloudflare Workers AI</option>
                     <option value="gemini">Google Gemini (Gemini 2.0 Flash)</option>
                     <option value="deepseek">DeepSeek AI (DeepSeek V3)</option>
                     <option value="openai">OpenAI (GPT-4o Mini)</option>
@@ -2357,7 +2377,7 @@ export default function AdminDashboardPage() {
 
             {/* LISTA DE TARJETAS DE CADA PROVEEDOR */}
             <div className="space-y-4">
-              {(['gemini', 'groq', 'openai', 'deepseek', 'elevenlabs'] as AiProvider[]).map((providerKey) => {
+              {(['gemini', 'groq', 'cerebras', 'openrouter', 'mistral', 'cohere', 'cloudflare', 'openai', 'deepseek', 'elevenlabs'] as AiProvider[]).map((providerKey) => {
                 const info = PROVIDER_INFO[providerKey];
                 const config = aiSettings.providers[providerKey];
                 const testResult = testResults[providerKey];
