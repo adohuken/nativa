@@ -103,20 +103,21 @@ export interface UserProfile {
 }
 
 const DEFAULT_USER_PROFILE: UserProfile = {
-  id: 'usr_david_01',
-  name: 'David Abarca',
-  username: 'davida',
-  email: 'david@nativa.edu',
+  id: '',
+  name: 'Estudiante',
+  username: '',
+  email: '',
   avatarEmoji: '👨‍🎓',
-  country: 'Nicaragua',
-  city: 'Managua',
-  university: 'Universidad Nacional de Ingeniería (UNI)',
-  targetLevel: 'B2 • Intercambio Académico',
+  avatarUrl: undefined,
+  country: '',
+  city: '',
+  university: '',
+  targetLevel: 'A1 • Principiante',
   dailyGoalMinutes: 20,
-  learningFocus: 'Inglés Universitario & Supervivencia en el Campus',
-  bio: 'Estudiante de ciencias de la computación. Enfocado en adquirir fluidez natural para conferencias y papers académicos sin traducción mental.',
-  createdAt: '2026-09-15',
-  accentPreference: 'uk',
+  learningFocus: 'Inglés General & Conversacional',
+  bio: '',
+  createdAt: new Date().toISOString().split('T')[0],
+  accentPreference: 'us',
   preferredStudyTime: 'afternoon',
   interfaceLanguage: 'es'
 };
@@ -445,6 +446,10 @@ export const AppStorage = {
       const data = localStorage.getItem(KEYS.USER_PROFILE);
       if (data) {
         const parsed = JSON.parse(data);
+        // Purgar datos de demostración previos si existían en localStorage
+        if (parsed.username === 'davida' && parsed.email === 'david@nativa.edu') {
+          return DEFAULT_USER_PROFILE;
+        }
         return { ...DEFAULT_USER_PROFILE, ...parsed };
       }
     } catch {}
@@ -677,7 +682,8 @@ export const AppStorage = {
           id: profile.id,
           email: profile.email || currentProfile.email,
           name: profile.name || currentProfile.name,
-          targetLevel: profile.current_level || currentProfile.targetLevel
+          targetLevel: profile.current_level || currentProfile.targetLevel,
+          avatarUrl: profile.avatar_url || undefined
         });
       }
 

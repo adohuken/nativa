@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -59,6 +59,12 @@ export function UserProfileModal({
   immersionMinutes
 }: UserProfileModalProps) {
   const [profile, setProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
+
+  useEffect(() => {
+    if (isOpen) {
+      setProfile(AppStorage.getUserProfile());
+    }
+  }, [isOpen]);
   const [activeTab, setActiveTab] = useState<ProfileTab>('GENERAL');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 

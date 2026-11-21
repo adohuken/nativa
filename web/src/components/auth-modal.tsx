@@ -13,7 +13,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Globe,
-  Loader2
+  Loader2,
+  AtSign,
+  Building2,
+  MapPin,
+  Compass
 } from 'lucide-react';
 import { getSupabaseClient, isSupabaseConfigured, DatabaseProfile } from '@/lib/supabase';
 import { AppStorage } from '@/lib/storage';
@@ -37,6 +41,11 @@ export function AuthModal({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [country, setCountry] = useState('');
+  const [city, setCity] = useState('');
+  const [university, setUniversity] = useState('');
+  const [learningFocus, setLearningFocus] = useState('Inglés General & Conversacional');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -51,6 +60,7 @@ export function AuthModal({
     soundManager.playClick();
 
     const client = getSupabaseClient();
+    const cleanUsername = (username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || email.split('@')[0]);
 
     // MODO LOCAL / DEMO SI SUPABASE AÚN NO TIENE CREDENCIALES
     if (!client || !isSupabaseConfigured) {
@@ -66,11 +76,25 @@ export function AuthModal({
           is_premium: false
         };
 
-        // Guardar sesión local
+        // Guardar sesión local limpia
         AppStorage.saveUserProfile({
-          ...AppStorage.getUserProfile(),
+          id: demoProfile.id,
           name: demoProfile.name,
-          email: demoProfile.email
+          username: cleanUsername,
+          email: demoProfile.email,
+          avatarEmoji: '👨‍🎓',
+          avatarUrl: undefined,
+          country: country.trim(),
+          city: city.trim(),
+          university: university.trim(),
+          targetLevel: 'A1 • Principiante',
+          dailyGoalMinutes: 20,
+          learningFocus: learningFocus,
+          bio: '',
+          createdAt: new Date().toISOString().split('T')[0],
+          accentPreference: 'us',
+          preferredStudyTime: 'afternoon',
+          interfaceLanguage: 'es'
         });
 
         if (mode === 'register') {
@@ -94,7 +118,12 @@ export function AuthModal({
           password: password.trim(),
           options: {
             data: {
-              full_name: fullName.trim() || email.split('@')[0]
+              full_name: fullName.trim() || cleanUsername,
+              username: cleanUsername,
+              country: country.trim(),
+              city: city.trim(),
+              university: university.trim(),
+              learning_focus: learningFocus
             }
           }
         });
@@ -114,12 +143,33 @@ export function AuthModal({
           const profile: DatabaseProfile = {
             id: data.user.id,
             email: data.user.email || email.trim(),
-            name: fullName.trim() || email.split('@')[0],
+            name: fullName.trim() || cleanUsername,
             current_level: 'A1',
             xp: 140,
             streak: 1,
             is_premium: false
           };
+
+          // Guardar perfil local limpio del usuario actual
+          AppStorage.saveUserProfile({
+            id: data.user.id,
+            name: profile.name,
+            username: cleanUsername,
+            email: profile.email,
+            avatarEmoji: '👨‍🎓',
+            avatarUrl: undefined,
+            country: country.trim(),
+            city: city.trim(),
+            university: university.trim(),
+            targetLevel: 'A1 • Principiante',
+            dailyGoalMinutes: 20,
+            learningFocus: learningFocus,
+            bio: '',
+            createdAt: new Date().toISOString().split('T')[0],
+            accentPreference: 'us',
+            preferredStudyTime: 'afternoon',
+            interfaceLanguage: 'es'
+          });
 
           // Guardar inmediatamente en tabla profiles y user_progress de Supabase
           try {
@@ -154,7 +204,7 @@ export function AuthModal({
         } else if (data.user) {
           // Requiere confirmación por email según la config del proyecto Supabase
           soundManager.playVictory();
-          setSuccessMessage('✓ ¡Cuenta creada! Te hemos enviado un correo de confirmación. Confírmalo e inicia sesión, o desactiva "Confirm email" en Supabase.');
+          setSuccessMessage('✓ ¡Cuenta creada! Si tienes activado "Confirm email" en Supabase, revisa tu correo para confirmar, o apágalo en Authentication > Providers para entrar directo.');
           setMode('login');
         }
       } else {
@@ -342,22 +392,110 @@ export function AuthModal({
         {/* Formulario */}
         <form onSubmit={handleEmailAuth} className="space-y-3.5">
           {mode === 'register' && (
-            <div className="space-y-1">
-              <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
-                Nombre Completo:
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Ej. David Abarca"
-                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium"
-                />
-                <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <>
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
+                  Nombre Completo:
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Ej. Bryan Castro"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium"
+                  />
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                </div>
               </div>
-            </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
+                  Nombre de Usuario (@handle):
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    placeholder="Ej. bryanc"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium"
+                  />
+                  <AtSign className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
+                    País:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      placeholder="Ej. Nicaragua"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium"
+                    />
+                    <Globe className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
+                    Ciudad:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Ej. Managua"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium"
+                    />
+                    <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
+                  Universidad o Empresa (Opcional):
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={university}
+                    onChange={(e) => setUniversity(e.target.value)}
+                    placeholder="Ej. Teleperformance, UNI, UCA o Particular"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium"
+                  />
+                  <Building2 className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
+                  Meta de Aprendizaje:
+                </label>
+                <div className="relative">
+                  <select
+                    value={learningFocus}
+                    onChange={(e) => setLearningFocus(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="Inglés General & Fluidez Natural">Inglés General & Fluidez Natural (MCER)</option>
+                    <option value="Call Center & Industria BPO">Call Center & Industria BPO (Customer Support)</option>
+                    <option value="Carrera Universitaria & Papers">Carrera Universitaria & Artículos Académicos</option>
+                    <option value="Entrevistas de Trabajo & Tech">Entrevistas de Trabajo & Tecnología</option>
+                    <option value="Viajes & Supervivencia Internacional">Viajes & Supervivencia Internacional</option>
+                  </select>
+                  <Compass className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+            </>
           )}
 
           <div className="space-y-1">
