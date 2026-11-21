@@ -217,7 +217,16 @@ export function AuthModal({
     } catch (err: any) {
       console.error('Auth error:', err);
       soundManager.playGentleError();
-      setErrorMessage(err?.message || 'Error al conectar con el servicio de autenticación.');
+      const rawMsg = err?.message || '';
+      if (
+        rawMsg.toLowerCase().includes('rate limit') ||
+        rawMsg.toLowerCase().includes('frecuencia') ||
+        err?.code === 'over_email_send_rate_limit'
+      ) {
+        setErrorMessage('Límite de correos por hora de Supabase alcanzado. Solución rápida: en tu Supabase ve a Authentication > Providers > Email y desactiva "Confirm email" para permitir registros inmediatos sin límite.');
+      } else {
+        setErrorMessage(rawMsg || 'Error al conectar con el servicio de autenticación.');
+      }
     } finally {
       setIsLoading(false);
     }
