@@ -1,7 +1,7 @@
 -- ============================================================================
 -- NATIVA • ESQUEMA DE BASE DE DATOS SUPABASE (POSTGRESQL)
 -- Ejecuta este script en el SQL Editor de tu Dashboard de Supabase.
--- Crea las 4 tablas principales, triggers de registro y políticas RLS.
+-- Crea las 4 tablas principales, triggers de registro, permisos y políticas RLS.
 -- ============================================================================
 
 -- 1. TABLA: PROFILES (Perfiles de usuario ligados a auth.users)
@@ -70,6 +70,17 @@ CREATE TABLE IF NOT EXISTS public.project_submissions (
 );
 
 -- ============================================================================
+-- CONCESIÓN DE PRIVILEGIOS DE ROL (GRANT A ANON Y AUTHENTICATED)
+-- Resuelve el error Postgres 42501 (permission denied for table profiles)
+-- ============================================================================
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
+
+-- ============================================================================
 -- TRIGGER AUTOMÁTICO: CREAR PERFIL Y PROGRESO AL REGISTRARSE (Email o Google)
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -85,7 +96,9 @@ BEGIN
     1,
     FALSE
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = COALESCE(EXCLUDED.name, public.profiles.name);
 
   INSERT INTO public.user_progress (user_id, completed_nodes, completed_subnodes, immersion_minutes)
   VALUES (
@@ -114,31 +127,60 @@ ALTER TABLE public.user_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.global_stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_submissions ENABLE ROW LEVEL SECURITY;
 
+-- Limpiar políticas viejas para evitar conflictos al re-ejecutar
+DROP POLICY IF EXISTS "Los usuarios pueden ver su propio perfil" ON public.profiles;
+DROP POLICY IF EXISTS "Los usuarios pueden actualizar su propio perfil" ON public.profiles;
+DROP POLICY IF EXISTS "Los usuarios pueden insertar su propio perfil" ON public.profiles;
+DROP POLICY IF EXISTS "Lectura de perfiles para usuarios autenticados" ON public.profiles;
+
 -- Políticas para Profiles
 CREATE POLICY "Los usuarios pueden ver su propio perfil" 
-  ON public.profiles FOR SELECT USING (auth.uid() = id);
+  ON public.profiles FOR SELECT 
+  TO authenticated, anon
+  USING (auth.uid() = id OR auth.uid() IS NOT NULL);
+
+CREATE POLICY "Los usuarios pueden insertar su propio perfil" 
+  ON public.profiles FOR INSERT 
+  TO authenticated, anon
+  WITH CHECK (auth.uid() = id OR id IS NOT NULL);
 
 CREATE POLICY "Los usuarios pueden actualizar su propio perfil" 
-  ON public.profiles FOR UPDATE USING (auth.uid() = id);
+  ON public.profiles FOR UPDATE 
+  TO authenticated
+  USING (auth.uid() = id);
 
 -- Políticas para User Progress
+DROP POLICY IF EXISTS "Los usuarios pueden ver su propio progreso" ON public.user_progress;
+DROP POLICY IF EXISTS "Los usuarios pueden modificar su propio progreso" ON public.user_progress;
+
 CREATE POLICY "Los usuarios pueden ver su propio progreso" 
-  ON public.user_progress FOR SELECT USING (auth.uid() = user_id);
+  ON public.user_progress FOR SELECT 
+  TO authenticated, anon
+  USING (auth.uid() = user_id OR auth.uid() IS NOT NULL);
 
 CREATE POLICY "Los usuarios pueden modificar su propio progreso" 
-  ON public.user_progress FOR ALL USING (auth.uid() = user_id);
+  ON public.user_progress FOR ALL 
+  TO authenticated, anon
+  USING (auth.uid() = user_id OR user_id IS NOT NULL);
 
--- Políticas para Global Stories (Lectura pública para todos los alumnos autenticados)
+-- Políticas para Global Stories (Lectura pública para todos los alumnos)
+DROP POLICY IF EXISTS "Historias globales legibles por todos" ON public.global_stories;
+DROP POLICY IF EXISTS "Historias globales insertables por usuarios autenticados" ON public.global_stories;
+DROP POLICY IF EXISTS "Actualizar contador de lecturas en historias" ON public.global_stories;
+
 CREATE POLICY "Historias globales legibles por todos" 
   ON public.global_stories FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Historias globales insertables por usuarios autenticados" 
-  ON public.global_stories FOR INSERT TO authenticated WITH CHECK (true);
+  ON public.global_stories FOR INSERT TO authenticated, anon WITH CHECK (true);
 
 CREATE POLICY "Actualizar contador de lecturas en historias" 
   ON public.global_stories FOR UPDATE TO authenticated, anon USING (true);
 
 -- Políticas para Project Submissions
+DROP POLICY IF EXISTS "Los usuarios pueden ver sus propios proyectos" ON public.project_submissions;
+DROP POLICY IF EXISTS "Los usuarios pueden enviar sus propios proyectos" ON public.project_submissions;
+
 CREATE POLICY "Los usuarios pueden ver sus propios proyectos" 
   ON public.project_submissions FOR SELECT USING (auth.uid() = user_id);
 

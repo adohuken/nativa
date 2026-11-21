@@ -101,22 +101,61 @@ export function AuthModal({
 
         if (error) throw error;
 
-        soundManager.playVictory();
-        setSuccessMessage('✓ ¡Cuenta creada con éxito! Revisa tu email para confirmar o inicia sesión.');
-        try { localStorage.setItem('nativa_should_show_placement', 'true'); } catch {}
-        
-        if (data.user) {
+        // Si el usuario ya estaba registrado en Supabase, identities viene vacío
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          setErrorMessage('Este correo ya está registrado en Nativa. Por favor ingresa con tu contraseña.');
+          setMode('login');
+          soundManager.playGentleError();
+          return;
+        }
+
+        // Si Supabase devuelve sesión activa (sin requerir confirmación por email)
+        if (data.session && data.user) {
           const profile: DatabaseProfile = {
             id: data.user.id,
-            email: data.user.email || email,
+            email: data.user.email || email.trim(),
             name: fullName.trim() || email.split('@')[0],
             current_level: 'A1',
             xp: 140,
             streak: 1,
             is_premium: false
           };
+
+          // Guardar inmediatamente en tabla profiles y user_progress de Supabase
+          try {
+            await client.from('profiles').upsert({
+              id: profile.id,
+              email: profile.email,
+              name: profile.name,
+              current_level: profile.current_level,
+              xp: profile.xp,
+              streak: profile.streak,
+              is_premium: profile.is_premium,
+              updated_at: new Date().toISOString()
+            });
+
+            await client.from('user_progress').upsert({
+              user_id: profile.id,
+              completed_nodes: ['a1-lesson-1'],
+              completed_subnodes: [],
+              immersion_minutes: 15,
+              skills: { listening: 65, speaking: 45, reading: 70, writing: 50 },
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+          } catch (dbErr) {
+            console.warn('Advertencia al insertar perfil inicial:', dbErr);
+          }
+
+          soundManager.playVictory();
+          setSuccessMessage('✓ ¡Cuenta creada e iniciada exitosamente!');
+          try { localStorage.setItem('nativa_should_show_placement', 'true'); } catch {}
           if (onAuthSuccess) onAuthSuccess(profile);
           setTimeout(() => onClose(), 1200);
+        } else if (data.user) {
+          // Requiere confirmación por email según la config del proyecto Supabase
+          soundManager.playVictory();
+          setSuccessMessage('✓ ¡Cuenta creada! Te hemos enviado un correo de confirmación. Confírmalo e inicia sesión, o desactiva "Confirm email" en Supabase.');
+          setMode('login');
         }
       } else {
         const { data, error } = await client.auth.signInWithPassword({
@@ -127,26 +166,51 @@ export function AuthModal({
         if (error) throw error;
 
         if (data.user) {
-          // Obtener perfil desde Supabase
-          const { data: profileData } = await client
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
+          // 1. Obtener perfil desde Supabase
+          let profileData: DatabaseProfile | null = null;
+          try {
+            const { data: fetchedProfile } = await client
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .maybeSingle();
+            profileData = fetchedProfile;
+          } catch (fetchErr) {
+            console.warn('Error leyendo perfil:', fetchErr);
+          }
 
-          const activeProfile: DatabaseProfile = profileData || {
-            id: data.user.id,
-            email: data.user.email || email,
-            name: data.user.user_metadata?.full_name || email.split('@')[0],
-            current_level: 'A1',
-            xp: 140,
-            streak: 1,
-            is_premium: false
-          };
+          // 2. Si no existía la fila en profiles, crearla de inmediato en la base de datos
+          if (!profileData) {
+            const initialProfile: DatabaseProfile = {
+              id: data.user.id,
+              email: data.user.email || email.trim(),
+              name: data.user.user_metadata?.full_name || email.split('@')[0],
+              current_level: 'A1',
+              xp: 140,
+              streak: 1,
+              is_premium: false
+            };
+            try {
+              await client.from('profiles').upsert({
+                id: initialProfile.id,
+                email: initialProfile.email,
+                name: initialProfile.name,
+                current_level: initialProfile.current_level,
+                xp: initialProfile.xp,
+                streak: initialProfile.streak,
+                is_premium: initialProfile.is_premium,
+                updated_at: new Date().toISOString()
+              });
+              profileData = initialProfile;
+            } catch (createErr) {
+              console.warn('No se pudo crear perfil en profiles:', createErr);
+              profileData = initialProfile;
+            }
+          }
 
           soundManager.playVictory();
-          setSuccessMessage(`✓ ¡Bienvenido de nuevo, ${activeProfile.name}!`);
-          if (onAuthSuccess) onAuthSuccess(activeProfile);
+          setSuccessMessage(`✓ ¡Bienvenido de nuevo, ${profileData.name}!`);
+          if (onAuthSuccess) onAuthSuccess(profileData);
           setTimeout(() => onClose(), 1000);
         }
       }
