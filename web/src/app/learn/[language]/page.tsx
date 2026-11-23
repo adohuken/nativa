@@ -363,8 +363,9 @@ function FluentiaPathContent() {
   const [isEvaluatingProject, setIsEvaluatingProject] = useState(false);
 
   // Estados interactivos dentro del Lesson Runner
-  const [audioSpeed, setAudioSpeed] = useState<number>(0.9);
+  const [audioSpeed, setAudioSpeed] = useState<number>(1.0);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isAudioPaused, setIsAudioPaused] = useState(false);
   const [activeAudioIndex, setActiveAudioIndex] = useState<number | null>(null);
   const [showTranslations, setShowTranslations] = useState<boolean>(true);
   const [revealedLineIndexes, setRevealedLineIndexes] = useState<number[]>([]);
@@ -713,21 +714,38 @@ function FluentiaPathContent() {
     soundManager.playClick();
   };
 
+  const pauseAudio = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.pause();
+      setIsAudioPaused(true);
+    }
+  };
+
+  const resumeAudio = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.resume();
+      setIsAudioPaused(false);
+    }
+  };
+
   const speakText = (text: string, lineIdx?: number, pitch: number = 1.0) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     setIsPlayingAudio(true);
-    if (lineIdx !== undefined) setActiveAudioIndex(lineIdx);
+    setIsAudioPaused(false);
+    setActiveAudioIndex(lineIdx !== undefined ? lineIdx : 0);
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     utterance.rate = audioSpeed;
     utterance.pitch = pitch;
     utterance.onend = () => {
       setIsPlayingAudio(false);
+      setIsAudioPaused(false);
       setActiveAudioIndex(null);
     };
     utterance.onerror = () => {
       setIsPlayingAudio(false);
+      setIsAudioPaused(false);
       setActiveAudioIndex(null);
     };
     window.speechSynthesis.speak(utterance);
@@ -736,6 +754,8 @@ function FluentiaPathContent() {
   const stopContinuousDialogue = () => {
     continuousStopRef.current = true;
     setIsContinuousPlaying(false);
+    setIsPlayingAudio(false);
+    setIsAudioPaused(false);
     setActiveAudioIndex(null);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -2172,11 +2192,16 @@ function FluentiaPathContent() {
             immersionMinutes={immersionMinutes}
             selectedStory={selectedImmersionStory}
             immersionLevelFilter={immersionLevelFilter}
-            isPlayingAudio={activeAudioIndex !== null}
+            isPlayingAudio={isPlayingAudio}
+            isAudioPaused={isAudioPaused}
+            audioSpeed={audioSpeed}
             onSelectStory={setSelectedImmersionStory}
             onFilterChange={setImmersionLevelFilter}
             onSpeakText={(text) => speakText(text)}
-            onStopAudio={() => stopContinuousDialogue()}
+            onPauseAudio={pauseAudio}
+            onResumeAudio={resumeAudio}
+            onStopAudio={stopContinuousDialogue}
+            onSpeedChange={(spd) => setAudioSpeed(spd)}
             onFinishStory={(story) => handleFinishImmersionStory(story)}
           />
         )}

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Clock,
   ArrowRight,
@@ -9,7 +9,10 @@ import {
   Sparkles,
   CheckCircle2,
   Check,
-  BookOpen
+  BookOpen,
+  Play,
+  Pause,
+  Square
 } from 'lucide-react';
 import { ImmersionStory, IMMERSION_STORIES } from '@/lib/immersion-data';
 import { soundManager } from '@/lib/sound-effects';
@@ -19,10 +22,15 @@ export interface ImmersionViewerProps {
   selectedStory: ImmersionStory | null;
   immersionLevelFilter: string;
   isPlayingAudio: boolean;
+  isAudioPaused?: boolean;
+  audioSpeed?: number;
   onSelectStory: (story: ImmersionStory | null) => void;
   onFilterChange: (level: string) => void;
   onSpeakText: (text: string) => void;
+  onPauseAudio?: () => void;
+  onResumeAudio?: () => void;
   onStopAudio: () => void;
+  onSpeedChange?: (speed: number) => void;
   onFinishStory: (story: ImmersionStory) => void;
 }
 
@@ -31,12 +39,33 @@ export function ImmersionViewer({
   selectedStory,
   immersionLevelFilter,
   isPlayingAudio,
+  isAudioPaused = false,
+  audioSpeed = 1.0,
   onSelectStory,
   onFilterChange,
   onSpeakText,
+  onPauseAudio,
+  onResumeAudio,
   onStopAudio,
+  onSpeedChange,
   onFinishStory
 }: ImmersionViewerProps) {
+  const [internalSpeed, setInternalSpeed] = useState<number>(audioSpeed);
+
+  const handleSpeedSelect = (speed: number) => {
+    setInternalSpeed(speed);
+    soundManager.playClick();
+    if (onSpeedChange) {
+      onSpeedChange(speed);
+    }
+    // Si ya está reproduciendo, reiniciar con nueva velocidad
+    if (isPlayingAudio && selectedStory) {
+      const fullText = selectedStory.paragraphs.join(' ');
+      onSpeakText(fullText);
+    }
+  };
+
+  const currentSpeed = onSpeedChange ? audioSpeed : internalSpeed;
   return (
     <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full space-y-8 pb-28 md:pb-8">
       {/* Header de la Sección de Inmersión */}
@@ -130,27 +159,84 @@ export function ImmersionViewer({
                 {selectedStory.subtitle}
               </p>
 
-              {/* Botón de Audio Narrativo */}
-              <div className="pt-3 flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    const fullText = selectedStory.paragraphs.join(' ');
-                    onSpeakText(fullText);
-                  }}
-                  className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white transition shadow-md shadow-emerald-500/20 cursor-pointer"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  <span>Escuchar Narración Completa en Audio Nativo</span>
-                </button>
-                {isPlayingAudio && (
+              {/* Barra de Control de Audio Narrativo y Velocidad */}
+              <div className="pt-3 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={onStopAudio}
-                    className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl bg-[#0e1626] hover:bg-[#152033] text-slate-300 border border-slate-700 transition cursor-pointer"
+                    onClick={() => {
+                      if (isPlayingAudio) {
+                        if (isAudioPaused) {
+                          if (onResumeAudio) onResumeAudio();
+                          else if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.resume();
+                        } else {
+                          if (onPauseAudio) onPauseAudio();
+                          else if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.pause();
+                        }
+                      } else {
+                        const fullText = selectedStory.paragraphs.join(' ');
+                        onSpeakText(fullText);
+                      }
+                      soundManager.playClick();
+                    }}
+                    className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition shadow-md cursor-pointer ${
+                      isPlayingAudio && !isAudioPaused
+                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black ring-2 ring-amber-400/30'
+                        : isPlayingAudio && isAudioPaused
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400/30 animate-pulse'
+                        : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white shadow-emerald-500/20'
+                    }`}
                   >
-                    <VolumeX className="w-4 h-4" />
-                    <span>Pausar</span>
+                    {isPlayingAudio && !isAudioPaused ? (
+                      <>
+                        <Pause className="w-4 h-4 fill-current text-slate-950" />
+                        <span>Pausar Narración</span>
+                      </>
+                    ) : isPlayingAudio && isAudioPaused ? (
+                      <>
+                        <Play className="w-4 h-4 fill-current text-slate-950" />
+                        <span>Reanudar Narración</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-4 h-4" />
+                        <span>Escuchar Narración Completa en Audio Nativo</span>
+                      </>
+                    )}
                   </button>
-                )}
+
+                  {isPlayingAudio && (
+                    <button
+                      onClick={() => {
+                        onStopAudio();
+                        soundManager.playClick();
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#0e1626] hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition cursor-pointer"
+                      title="Detener audio completamente"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span>Detener</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Selector de Velocidad */}
+                <div className="flex items-center bg-[#0e1626] border border-slate-700/80 rounded-xl p-0.5 text-[10px] font-mono">
+                  <span className="px-2 text-slate-400 text-[10px] uppercase font-bold">Velocidad:</span>
+                  {[0.75, 0.85, 1.0, 1.25].map((spd) => (
+                    <button
+                      key={spd}
+                      onClick={() => handleSpeedSelect(spd)}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                        currentSpeed === spd
+                          ? 'bg-emerald-500 text-slate-950 font-black shadow-xs'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}
+                      title={`Velocidad ${spd}x`}
+                    >
+                      {spd}x
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

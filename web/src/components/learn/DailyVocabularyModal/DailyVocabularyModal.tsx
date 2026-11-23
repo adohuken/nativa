@@ -15,7 +15,10 @@ import {
   Flame,
   Check,
   Brain,
-  MessageSquare
+  MessageSquare,
+  Play,
+  Pause,
+  Square
 } from 'lucide-react';
 import {
   VocabularyWord,
@@ -48,6 +51,9 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
   // Estado del Reto Semanal
   const [essayText, setEssayText] = useState<string>('');
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [audioSpeed, setAudioSpeed] = useState<number>(0.85);
+  const [speakingText, setSpeakingText] = useState<string | null>(null);
+  const [isAudioPaused, setIsAudioPaused] = useState<boolean>(false);
   const [challengeResult, setChallengeResult] = useState<{
     passed: boolean;
     score: number;
@@ -55,6 +61,14 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
     usedWords: string[];
     corrections?: string;
   } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -76,13 +90,44 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
     new RegExp(`\\b${tw.toLowerCase()}`, 'i').test(essayText)
   );
 
-  const speak = (text: string) => {
+  const toggleSpeak = (text: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    
+    if (speakingText === text) {
+      if (!isAudioPaused) {
+        window.speechSynthesis.pause();
+        setIsAudioPaused(true);
+        return;
+      } else {
+        window.speechSynthesis.resume();
+        setIsAudioPaused(false);
+        return;
+      }
+    }
+
     window.speechSynthesis.cancel();
+    setSpeakingText(text);
+    setIsAudioPaused(false);
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'en-US';
-    u.rate = 0.9;
+    u.rate = audioSpeed;
+    u.onend = () => {
+      setSpeakingText(null);
+      setIsAudioPaused(false);
+    };
+    u.onerror = () => {
+      setSpeakingText(null);
+      setIsAudioPaused(false);
+    };
     window.speechSynthesis.speak(u);
+  };
+
+  const stopAudio = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingText(null);
+    setIsAudioPaused(false);
   };
 
   const handleClaim = async () => {
@@ -205,48 +250,117 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
                 </div>
               </div>
 
+              {/* Barra de Control de Velocidad */}
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-mono text-slate-400 font-bold">
+                  Audios Nativos en Contexto
+                </span>
+                <div className="flex items-center bg-[#0d1322] border border-slate-800 rounded-xl p-0.5 text-[10px] font-mono">
+                  <span className="px-2 text-slate-500 font-bold uppercase hidden sm:inline">Velocidad:</span>
+                  {[0.75, 0.85, 1.0, 1.25].map((spd) => (
+                    <button
+                      key={spd}
+                      onClick={() => {
+                        setAudioSpeed(spd);
+                        soundManager.playClick();
+                      }}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition cursor-pointer ${
+                        audioSpeed === spd
+                          ? 'bg-emerald-500 text-slate-950 font-black'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title={`Velocidad ${spd}x`}
+                    >
+                      {spd}x
+                    </button>
+                  ))}
+                  {speakingText && (
+                    <button
+                      onClick={stopAudio}
+                      className="ml-1 p-1 rounded-md text-slate-400 hover:text-rose-400 transition"
+                      title="Detener audio"
+                    >
+                      <Square className="w-3 h-3 fill-current" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* 3 Tarjetas de Palabras Contextualizadas */}
               <div className="space-y-3">
-                {dailyWords.map((wordItem) => (
-                  <div
-                    key={wordItem.id}
-                    className="p-4 rounded-2xl bg-[#0d1322] border border-slate-800 hover:border-slate-700 transition space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-base font-extrabold text-white">{wordItem.word}</span>
-                        <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-lg">
-                          {wordItem.phonetic}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">{wordItem.topic}</span>
-                      </div>
+                {dailyWords.map((wordItem) => {
+                  const isWordPlaying = speakingText === wordItem.word;
+                  const isSentencePlaying = speakingText === wordItem.example_sentence;
 
-                      <button
-                        onClick={() => speak(wordItem.word)}
-                        className="p-2 rounded-xl bg-[#090e1a] hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
-                        title="Escuchar pronunciación nativa"
-                      >
-                        <Volume2 className="w-4 h-4 text-emerald-400" />
-                      </button>
-                    </div>
+                  return (
+                    <div
+                      key={wordItem.id}
+                      className="p-4 rounded-2xl bg-[#0d1322] border border-slate-800 hover:border-slate-700 transition space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-base font-extrabold text-white">{wordItem.word}</span>
+                          <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-lg">
+                            {wordItem.phonetic}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">{wordItem.topic}</span>
+                        </div>
 
-                    <div className="p-3 rounded-xl bg-[#070b14] border border-slate-800/80 space-y-1">
-                      <div className="flex items-center justify-between text-xs text-slate-200">
-                        <span className="font-semibold italic text-emerald-300">"{wordItem.example_sentence}"</span>
                         <button
-                          onClick={() => speak(wordItem.example_sentence)}
-                          className="text-slate-500 hover:text-emerald-400 transition"
-                          title="Escuchar oración completa"
+                          onClick={() => toggleSpeak(wordItem.word)}
+                          className={`p-2 rounded-xl border transition cursor-pointer ${
+                            isWordPlaying
+                              ? isAudioPaused
+                                ? 'bg-amber-950/70 border-amber-500 text-amber-300'
+                                : 'bg-emerald-950/70 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30'
+                              : 'bg-[#090e1a] hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                          }`}
+                          title={isWordPlaying ? (isAudioPaused ? "Reanudar" : "Pausar") : "Escuchar pronunciación nativa"}
                         >
-                          <Volume2 className="w-3.5 h-3.5" />
+                          {isWordPlaying ? (
+                            isAudioPaused ? (
+                              <Play className="w-4 h-4 fill-current text-amber-400" />
+                            ) : (
+                              <Pause className="w-4 h-4 fill-current text-emerald-400" />
+                            )
+                          ) : (
+                            <Volume2 className="w-4 h-4 text-emerald-400" />
+                          )}
                         </button>
                       </div>
-                      <p className="text-[11px] text-slate-400">
-                        • {wordItem.definition}
-                      </p>
+
+                      <div className="p-3 rounded-xl bg-[#070b14] border border-slate-800/80 space-y-1">
+                        <div className="flex items-center justify-between text-xs text-slate-200">
+                          <span className="font-semibold italic text-emerald-300">"{wordItem.example_sentence}"</span>
+                          <button
+                            onClick={() => toggleSpeak(wordItem.example_sentence)}
+                            className={`p-1 rounded-md transition cursor-pointer ${
+                              isSentencePlaying
+                                ? isAudioPaused
+                                  ? 'text-amber-400'
+                                  : 'text-emerald-300'
+                                : 'text-slate-500 hover:text-emerald-400'
+                            }`}
+                            title={isSentencePlaying ? (isAudioPaused ? "Reanudar" : "Pausar") : "Escuchar oración completa"}
+                          >
+                            {isSentencePlaying ? (
+                              isAudioPaused ? (
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                              ) : (
+                                <Pause className="w-3.5 h-3.5 fill-current" />
+                              )
+                            ) : (
+                              <Volume2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          • {wordItem.definition}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Botón de Acción */}

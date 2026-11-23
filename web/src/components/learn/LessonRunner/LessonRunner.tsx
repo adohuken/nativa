@@ -6,7 +6,7 @@ import {
   X, Zap, Keyboard, ChevronRight, Volume2, Sparkles,
   CheckCircle2, RotateCcw, Mic, Star,
   ArrowRight, BookOpen, VolumeX, Eye, EyeOff, Trophy,
-  Activity, Headphones, Bot, User, Compass
+  Activity, Headphones, Bot, User, Compass, Play, Pause, Square
 } from 'lucide-react';
 import { IntensiveLesson, StoryEvent } from '@/lib/curriculum-data';
 import { LEVEL_THEMES, BuilderToken } from '../types';
@@ -36,10 +36,31 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [audioSpeed, setAudioSpeed] = useState<number>(1.0);
   const [activeAudioIndex, setActiveAudioIndex] = useState<number | null>(null);
+  const [isAudioSpeaking, setIsAudioSpeaking] = useState<boolean>(false);
+  const [isAudioPaused, setIsAudioPaused] = useState<boolean>(false);
   const [isContinuousPlaying, setIsContinuousPlaying] = useState<boolean>(false);
+  const [isContinuousPaused, setIsContinuousPaused] = useState<boolean>(false);
+  
   const continuousStopRef = useRef<boolean>(false);
+  const currentLineRef = useRef<number>(0);
+  const audioSpeedRef = useRef<number>(1.0);
   const [revealedLineIndexes, setRevealedLineIndexes] = useState<number[]>([]);
   const [showTranslations, setShowTranslations] = useState<boolean>(false);
+
+  // Mantener audioSpeedRef sincronizado
+  useEffect(() => {
+    audioSpeedRef.current = audioSpeed;
+  }, [audioSpeed]);
+
+  // Limpiar audio al desmontar componente
+  useEffect(() => {
+    return () => {
+      continuousStopRef.current = true;
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Paso 2: Comprensión
   const [step2SelectedIdx, setStep2SelectedIdx] = useState<number | null>(null);
@@ -68,80 +89,170 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
 
   const handleToggleStarPhrase = onToggleStarPhrase;
 
-  // Síntesis de Voz
-  const speakText = (text: string, lineIdx?: number, pitch: number = 1.0) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    if (lineIdx !== undefined) setActiveAudioIndex(lineIdx);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = audioSpeed;
-    utterance.pitch = pitch;
-    utterance.onend = () => {
-      setActiveAudioIndex(null);
-    };
-    utterance.onerror = () => {
-      setActiveAudioIndex(null);
-    };
-    window.speechSynthesis.speak(utterance);
+  // ==========================================
+  // CONTROL MAESTRO DE SÍNTESIS DE VOZ Y AUDIO
+  // ==========================================
+  const pauseAudio = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.pause();
+      setIsAudioPaused(true);
+      if (isContinuousPlaying) {
+        setIsContinuousPaused(true);
+      }
+    }
   };
 
-  const stopContinuousDialogue = () => {
+  const resumeAudio = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+        setIsAudioPaused(false);
+        if (isContinuousPlaying) {
+          setIsContinuousPaused(false);
+        }
+      } else {
+        // En caso de que el navegador pierda el estado paused, reanudar limpiamente
+        setIsAudioPaused(false);
+        if (isContinuousPlaying) {
+          setIsContinuousPaused(false);
+          playLineAt(currentLineRef.current);
+        }
+      }
+    }
+  };
+
+  const stopAllAudio = () => {
     continuousStopRef.current = true;
     setIsContinuousPlaying(false);
+    setIsContinuousPaused(false);
+    setIsAudioSpeaking(false);
+    setIsAudioPaused(false);
     setActiveAudioIndex(null);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
   };
 
-  const playContinuousDialogue = () => {
+  const stopContinuousDialogue = stopAllAudio;
+
+  const speakText = (text: string, lineIdx?: number, pitch: number = 1.0) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    if (lineIdx !== undefined) setActiveAudioIndex(lineIdx);
+    setIsAudioSpeaking(true);
+    setIsAudioPaused(false);
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = audioSpeedRef.current;
+    utterance.pitch = pitch;
+
+    utterance.onend = () => {
+      setIsAudioSpeaking(false);
+      setIsAudioPaused(false);
+      setActiveAudioIndex(null);
+    };
+    utterance.onerror = () => {
+      setIsAudioSpeaking(false);
+      setIsAudioPaused(false);
+      setActiveAudioIndex(null);
+    };
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleSpeakLine = (line: { en: string; speaker: string }, idx: number) => {
     if (isContinuousPlaying) {
-      stopContinuousDialogue();
+      stopAllAudio();
+    }
+
+    if (activeAudioIndex === idx && isAudioSpeaking) {
+      if (!isAudioPaused) {
+        pauseAudio();
+      } else {
+        resumeAudio();
+      }
       return;
     }
-    continuousStopRef.current = false;
-    setIsContinuousPlaying(true);
-    const lines = lesson.step1_dialogue.lines;
 
-    const playLineAt = (index: number) => {
-      if (continuousStopRef.current || index >= lines.length) {
+    const isStudent = line.speaker.toLowerCase().includes('david') || line.speaker.toLowerCase().includes('learner') || line.speaker.toLowerCase().includes('candidate');
+    speakText(line.en, idx, isStudent ? 1.08 : 0.94);
+  };
+
+  const playLineAt = (index: number) => {
+    const lines = lesson.step1_dialogue.lines;
+    if (continuousStopRef.current || index >= lines.length) {
+      setIsContinuousPlaying(false);
+      setIsContinuousPaused(false);
+      setIsAudioSpeaking(false);
+      setActiveAudioIndex(null);
+      return;
+    }
+
+    currentLineRef.current = index;
+    setActiveAudioIndex(index);
+    setIsAudioSpeaking(true);
+    setIsAudioPaused(false);
+
+    const line = lines[index];
+    const utterance = new SpeechSynthesisUtterance(line.en);
+    utterance.lang = 'en-US';
+    utterance.rate = audioSpeedRef.current;
+    const isStudent = line.speaker.toLowerCase().includes('david') || line.speaker.toLowerCase().includes('learner') || line.speaker.toLowerCase().includes('candidate');
+    utterance.pitch = isStudent ? 1.08 : 0.94;
+
+    utterance.onend = () => {
+      if (continuousStopRef.current) {
         setIsContinuousPlaying(false);
+        setIsContinuousPaused(false);
+        setIsAudioSpeaking(false);
         setActiveAudioIndex(null);
         return;
       }
-      setActiveAudioIndex(index);
-      const line = lines[index];
-      const utterance = new SpeechSynthesisUtterance(line.en);
-      utterance.lang = 'en-US';
-      utterance.rate = audioSpeed;
-      const isStudent = line.speaker.toLowerCase().includes('david') || line.speaker.toLowerCase().includes('learner');
-      utterance.pitch = isStudent ? 1.08 : 0.94;
-
-      utterance.onend = () => {
-        if (continuousStopRef.current) {
-          setIsContinuousPlaying(false);
-          setActiveAudioIndex(null);
-          return;
+      setTimeout(() => {
+        if (!continuousStopRef.current && !isContinuousPaused) {
+          playLineAt(index + 1);
         }
-        setTimeout(() => {
-          if (!continuousStopRef.current) {
-            playLineAt(index + 1);
-          }
-        }, 450);
-      };
-
-      utterance.onerror = () => {
-        setIsContinuousPlaying(false);
-        setActiveAudioIndex(null);
-      };
-
-      window.speechSynthesis.speak(utterance);
+      }, 450);
     };
 
-    window.speechSynthesis.cancel();
+    utterance.onerror = () => {
+      setIsContinuousPlaying(false);
+      setIsContinuousPaused(false);
+      setIsAudioSpeaking(false);
+      setActiveAudioIndex(null);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const playContinuousDialogue = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (isContinuousPlaying) {
+      if (isContinuousPaused) {
+        resumeAudio();
+      } else {
+        pauseAudio();
+      }
+      return;
+    }
+
+    stopAllAudio();
+    continuousStopRef.current = false;
+    setIsContinuousPlaying(true);
+    setIsContinuousPaused(false);
+    currentLineRef.current = 0;
     playLineAt(0);
+  };
+
+  const handleSpeedChange = (speed: number) => {
+    setAudioSpeed(speed);
+    audioSpeedRef.current = speed;
+    soundManager.playClick();
+    // Si hay audio activo en una línea o diálogo, actualizarlo de inmediato
+    if (isContinuousPlaying && !isContinuousPaused && activeAudioIndex !== null) {
+      window.speechSynthesis.cancel();
+      playLineAt(currentLineRef.current);
+    }
   };
 
   const toggleLineTranslation = (idx: number) => {
@@ -401,19 +512,23 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
             <span>[Espacio] Audio • [1-4] Opciones • [Enter] Siguiente</span>
           </div>
 
-          <div className="hidden sm:flex items-center bg-[#0c111c] border border-slate-800 rounded-xl p-0.5 text-[10px] font-mono font-bold">
-            <button
-              onClick={() => setAudioSpeed(0.8)}
-              className={`px-2 py-1 rounded-lg transition ${audioSpeed === 0.8 ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-            >
-              0.8x
-            </button>
-            <button
-              onClick={() => setAudioSpeed(1.0)}
-              className={`px-2 py-1 rounded-lg transition ${audioSpeed === 1.0 ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-            >
-              1.0x
-            </button>
+          {/* Selector de Velocidad Multi-Escala */}
+          <div className="flex items-center bg-[#0c111c] border border-slate-800 rounded-xl p-0.5 text-[10px] font-mono font-bold">
+            <span className="px-1.5 text-slate-500 text-[9px] uppercase hidden md:inline">Velocidad:</span>
+            {[0.75, 0.85, 1.0, 1.25].map((speed) => (
+              <button
+                key={speed}
+                onClick={() => handleSpeedChange(speed)}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                  audioSpeed === speed
+                    ? 'bg-emerald-500 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+                title={`Velocidad de reproducción ${speed}x`}
+              >
+                {speed}x
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl shadow-sm">
@@ -454,11 +569,11 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-auto">
+                <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
                   {/* Toggle de Traducciones para evitar traducción mental */}
                   <button
                     onClick={() => setShowTranslations(!showTranslations)}
-                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition ${showTranslations
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition cursor-pointer ${showTranslations
                       ? 'bg-[#0e1626] text-slate-300 border-slate-700 hover:text-white'
                       : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
                       }`}
@@ -471,7 +586,7 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                   {/* Toggle de Ayuda Fonética Opcional */}
                   <button
                     onClick={() => setShowFigurativeHelper(!showFigurativeHelper)}
-                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition ${showFigurativeHelper
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition cursor-pointer ${showFigurativeHelper
                       ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
                       : 'bg-[#0e1626] text-slate-300 hover:text-amber-300 border-slate-700'
                       }`}
@@ -481,17 +596,53 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                     <span className="text-[11px]">{showFigurativeHelper ? 'Ocultar Apoyo' : 'Apoyo Fonético'}</span>
                   </button>
 
-                  {/* Reproductor de Diálogo Continuo e Inmersivo */}
-                  <button
-                    onClick={playContinuousDialogue}
-                    className={`flex items-center gap-2 text-xs font-bold px-3.5 py-1.5 rounded-xl transition shadow-md ${isContinuousPlaying
-                      ? 'bg-rose-600 text-white shadow-rose-600/30 animate-pulse'
-                      : 'bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-slate-950 font-black shadow-emerald-500/20'
+                  {/* Controles del Reproductor de Diálogo Continuo */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={playContinuousDialogue}
+                      className={`flex items-center gap-2 text-xs font-bold px-3.5 py-1.5 rounded-xl transition shadow-md cursor-pointer ${
+                        isContinuousPlaying && !isContinuousPaused
+                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black ring-2 ring-amber-400/30'
+                          : isContinuousPlaying && isContinuousPaused
+                          ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400/30 animate-pulse'
+                          : 'bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-slate-950 font-black shadow-emerald-500/20'
                       }`}
-                  >
-                    {isContinuousPlaying ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    <span>{isContinuousPlaying ? 'Detener Diálogo' : 'Todo el Diálogo'}</span>
-                  </button>
+                      title={
+                        isContinuousPlaying && !isContinuousPaused
+                          ? 'Pausar reproducción continua'
+                          : isContinuousPlaying && isContinuousPaused
+                          ? 'Reanudar reproducción continua'
+                          : 'Reproducir todo el diálogo de corrido'
+                      }
+                    >
+                      {isContinuousPlaying && !isContinuousPaused ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5 fill-current" />
+                          <span>Pausar Diálogo</span>
+                        </>
+                      ) : isContinuousPlaying && isContinuousPaused ? (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Reanudar Diálogo</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-4 h-4" />
+                          <span>Todo el Diálogo</span>
+                        </>
+                      )}
+                    </button>
+
+                    {isContinuousPlaying && (
+                      <button
+                        onClick={stopAllAudio}
+                        className="p-1.5 rounded-xl bg-[#0e1626] hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition cursor-pointer"
+                        title="Detener audio completamente"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -520,7 +671,9 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
 
                       {/* Burbuja del Mensaje con Iluminación Activa */}
                       <div className={`max-w-[85%] sm:max-w-[78%] rounded-2xl p-4 transition duration-200 border-2 shadow-sm ${isPlayingThisLine
-                        ? 'ring-2 ring-emerald-500 shadow-md border-emerald-500'
+                        ? isAudioPaused
+                          ? 'ring-2 ring-amber-500 shadow-md border-amber-500'
+                          : 'ring-2 ring-emerald-500 shadow-md border-emerald-500'
                         : ''
                         } ${isStudent
                           ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100 rounded-tr-sm hover:border-emerald-400'
@@ -536,7 +689,7 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                             {/* Botón Frase Estrella ⭐ para Repaso SRS */}
                             <button
                               onClick={() => handleToggleStarPhrase(line, lesson)}
-                              className={`p-1.5 rounded-lg transition ${isStarred
+                              className={`p-1.5 rounded-lg transition cursor-pointer ${isStarred
                                 ? 'text-amber-400 bg-amber-500/20 ring-1 ring-amber-400/40 shadow-xs'
                                 : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800'
                                 }`}
@@ -545,24 +698,33 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                               <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-amber-400 text-amber-400' : ''}`} />
                             </button>
 
-                            {/* Botón de Audio con Visualizador de Onda */}
+                            {/* Botón de Audio con Control de Play / Pausa / Reanudación */}
                             <button
-                              onClick={() => {
-                                if (isContinuousPlaying) stopContinuousDialogue();
-                                speakText(line.en, idx, isStudent ? 1.08 : 0.94);
-                              }}
-                              className={`p-1.5 rounded-lg transition ${isPlayingThisLine
-                                ? 'text-emerald-300 bg-emerald-950/80 ring-2 ring-emerald-500/40'
+                              onClick={() => toggleSpeakLine(line, idx)}
+                              className={`p-1.5 rounded-lg transition cursor-pointer ${isPlayingThisLine
+                                ? isAudioPaused
+                                  ? 'text-amber-300 bg-amber-950/80 ring-2 ring-amber-500/40'
+                                  : 'text-emerald-300 bg-emerald-950/80 ring-2 ring-emerald-500/40'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                 }`}
-                              title="Escuchar pronunciación nativa"
+                              title={
+                                isPlayingThisLine
+                                  ? isAudioPaused
+                                    ? "Reanudar audio"
+                                    : "Pausar audio"
+                                  : "Escuchar pronunciación nativa"
+                              }
                             >
                               {isPlayingThisLine ? (
-                                <div className="flex items-center gap-0.5 h-3.5 px-0.5">
-                                  <span className="w-0.5 bg-emerald-400 h-2.5 animate-pulse rounded-full" />
-                                  <span className="w-0.5 bg-emerald-300 h-3.5 animate-bounce rounded-full" />
-                                  <span className="w-0.5 bg-emerald-400 h-2 animate-pulse rounded-full" />
-                                </div>
+                                isAudioPaused ? (
+                                  <Play className="w-3.5 h-3.5 fill-current text-amber-400" />
+                                ) : (
+                                  <div className="flex items-center gap-0.5 h-3.5 px-0.5">
+                                    <span className="w-0.5 bg-emerald-400 h-2.5 animate-pulse rounded-full" />
+                                    <span className="w-0.5 bg-emerald-300 h-3.5 animate-bounce rounded-full" />
+                                    <span className="w-0.5 bg-emerald-400 h-2 animate-pulse rounded-full" />
+                                  </div>
+                                )
                               ) : (
                                 <Volume2 className="w-3.5 h-3.5" />
                               )}
@@ -633,13 +795,53 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => speakText(lesson.step2_comprehension.audioContextText)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-slate-950 font-black text-xs transition shadow-sm"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  <span>Reproducir Pasaje</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (activeAudioIndex === 999 && isAudioSpeaking) {
+                        if (isAudioPaused) resumeAudio();
+                        else pauseAudio();
+                      } else {
+                        speakText(lesson.step2_comprehension.audioContextText, 999);
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer ${
+                      activeAudioIndex === 999 && isAudioSpeaking
+                        ? isAudioPaused
+                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black'
+                          : 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-slate-950 font-black'
+                    }`}
+                  >
+                    {activeAudioIndex === 999 && isAudioSpeaking ? (
+                      isAudioPaused ? (
+                        <>
+                          <Play className="w-4 h-4 fill-current text-slate-950" />
+                          <span>Reanudar Pasaje</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pause className="w-4 h-4 fill-current text-slate-950" />
+                          <span>Pausar Pasaje</span>
+                        </>
+                      )
+                    ) : (
+                      <>
+                        <Volume2 className="w-4 h-4" />
+                        <span>Reproducir Pasaje</span>
+                      </>
+                    )}
+                  </button>
+                  {activeAudioIndex === 999 && isAudioSpeaking && (
+                    <button
+                      onClick={stopAllAudio}
+                      className="p-2.5 rounded-xl bg-[#0c111c] hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 transition cursor-pointer"
+                      title="Detener audio"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -968,16 +1170,58 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                         <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-0.5 rounded-md font-bold uppercase">
                           {phrase.levelLabel} {isCurrentActivePhrase && '• Seleccionada'}
                         </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            speakText(phrase.en);
-                          }}
-                          className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-emerald-400 transition bg-[#080c14] px-3 py-1.5 rounded-xl border border-slate-800 font-medium"
-                        >
-                          <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Escuchar Modelo</span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const audioId = 4000 + idx;
+                              if (activeAudioIndex === audioId && isAudioSpeaking) {
+                                if (isAudioPaused) resumeAudio();
+                                else pauseAudio();
+                              } else {
+                                speakText(phrase.en, audioId);
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 text-xs transition px-3 py-1.5 rounded-xl border font-medium cursor-pointer ${
+                              activeAudioIndex === 4000 + idx && isAudioSpeaking
+                                ? isAudioPaused
+                                  ? 'bg-amber-950/70 border-amber-500 text-amber-300'
+                                  : 'bg-emerald-950/70 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30'
+                                : 'bg-[#080c14] border-slate-800 text-slate-300 hover:text-emerald-400 hover:border-slate-700'
+                            }`}
+                          >
+                            {activeAudioIndex === 4000 + idx && isAudioSpeaking ? (
+                              isAudioPaused ? (
+                                <>
+                                  <Play className="w-3.5 h-3.5 fill-current text-amber-400" />
+                                  <span>Reanudar</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Pause className="w-3.5 h-3.5 fill-current text-emerald-400" />
+                                  <span>Pausar</span>
+                                </>
+                              )
+                            ) : (
+                              <>
+                                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Escuchar Modelo</span>
+                              </>
+                            )}
+                          </button>
+                          {activeAudioIndex === 4000 + idx && isAudioSpeaking && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                stopAllAudio();
+                              }}
+                              className="p-1.5 rounded-xl bg-[#080c14] hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-800 transition cursor-pointer"
+                              title="Detener audio"
+                            >
+                              <Square className="w-3 h-3 fill-current" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <h3 className="text-base md:text-lg font-bold text-white">
