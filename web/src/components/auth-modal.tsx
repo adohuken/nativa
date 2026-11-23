@@ -345,6 +345,17 @@ export function AuthModal({
         err?.code === 'over_email_send_rate_limit'
       ) {
         setErrorMessage('Límite de correos por hora de Supabase alcanzado. Solución rápida: en tu Supabase ve a Authentication > Providers > Email y desactiva "Confirm email" para permitir registros inmediatos sin límite.');
+      } else if (
+        rawMsg.toLowerCase().includes('user already registered') ||
+        rawMsg.toLowerCase().includes('already registered')
+      ) {
+        setErrorMessage('Este correo ya está registrado en Nativa. Te hemos cambiado a la pestaña "Iniciar Sesión" para que ingreses tu contraseña.');
+        setMode('login');
+      } else if (
+        rawMsg.toLowerCase().includes('invalid login credentials') ||
+        rawMsg.toLowerCase().includes('invalid_grant')
+      ) {
+        setErrorMessage('Correo o contraseña incorrectos. Por favor verifica tus datos e inténtalo de nuevo.');
       } else {
         setErrorMessage(rawMsg || 'Error al conectar con el servicio de autenticación.');
       }

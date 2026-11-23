@@ -1,0 +1,609 @@
+================================================================================
+          AUDITORÍA INTEGRAL DE SISTEMA, FUNCIONALIDADES Y SEGURIDAD
+                              PLATAFORMA NATIVA
+================================================================================
+Fecha de Emisión: 23 de Noviembre de 2026
+Objetivo: Auditoría minuciosa de arquitectura, inventario de funciones visibles
+y ocultas, análisis de superficie de ataque, vulnerabilidades y remediaciones.
+================================================================================
+
+--------------------------------------------------------------------------------
+ÍNDICE GENERAL
+--------------------------------------------------------------------------------
+1. RESUMEN EJECUTIVO Y FICHA TÉCNICA
+2. INVENTARIO DE FUNCIONALIDADES VISIBLES (EXPERIENCIA DEL ESTUDIANTE)
+   2.1. Landing Page y Acceso
+   2.2. Autenticación y Onboarding Gamificado
+   2.3. Dashboard y Mapa Curricular Universitario (A1 - C2)
+   2.4. Corredor de Lecciones Interactivo (Lesson Runner en 6 Etapas)
+   2.5. Biblioteca de Inmersión Masiva (Input Comprensible Krashen i+1)
+   2.6. Taller de Escritura y Proyectos con Rúbrica Oxford/Cambridge
+   2.7. Cofre Diario de Vocabulario y Reto Semanal de Ensayo
+   2.8. Sistema de Repetición Espaciada (SRS Flashcards)
+   2.9. Track Especializado Call Center BPO
+   2.10. Herramientas Auxiliares (Placement Test, Biblioteca Temática, Perfil)
+3. INVENTARIO DE FUNCIONALIDADES NO VISIBLES / BACKEND / OCULTAS
+   3.1. Panel Maestro de Administración (/admin)
+   3.2. Panel Corporativo B2B (/admin/company/[code])
+   3.3. Rutas de API en Servidor (/api/*)
+   3.4. Capa de Base de Datos Supabase (PostgreSQL & Triggers)
+   3.5. Arquitectura Residual / Código Paralelo (NestJS & Prisma)
+4. AUDITORÍA DE SEGURIDAD Y MATRIZ DE VULNERABILIDADES
+   4.1. VULN-01 [CRÍTICA]: Políticas RLS Permisivas en Supabase (Bypass de Privilegios)
+   4.2. VULN-02 [ALTA]: Almacenamiento de Contraseña en Texto Plano en LocalStorage
+   4.3. VULN-03 [ALTA]: Falsificación de Cookie de Sesión en Middleware Administrativo
+   4.4. VULN-04 [ALTA]: Endpoints de IA Expuestos sin Autenticación ni Rate Limiting
+   4.5. VULN-05 [ALTA]: Token Personal de GitHub Activo en Configuración Git y Scripts
+   4.6. VULN-06 [MEDIA]: Credenciales Anon en Dockerfile Build Args
+   4.7. VULN-07 [MEDIA]: Endpoint de Sincronización de Progreso Suceptible a IDOR
+   4.8. VULN-08 [MEDIA]: Ausencia de Cabeceras de Seguridad HTTP (CSP, HSTS, X-Frame)
+   4.9. VULN-09 [BAJA]: Duplicidad Arquitectural y Código Muerto (NestJS / Prisma)
+5. PLAN DE REMEDIACIÓN Y CÓDIGO DE CORRECCIÓN INMEDIATA
+   5.1. Script SQL Corregido para Supabase (RLS Blindado)
+   5.2. Corrección del Middleware de Próxima Generación
+   5.3. Higienización de Credenciales y LocalStorage
+   5.4. Aseguramiento de Endpoints de Inteligencia Artificial
+
+================================================================================
+1. RESUMEN EJECUTIVO Y FICHA TÉCNICA
+================================================================================
+Nativa es una plataforma web orientada a la adquisición natural de segundas lenguas
+(SLA) basada en el modelo de Input Comprensible (i + 1) de Stephen Krashen,
+enfocada en evitar la traducción mental mediante inmersión contextual, fonética IPA,
+evaluaciones formativas de baja ansiedad y preparación para entornos BPO/Universitarios.
+
+* Arquitectura de Producción Activa:
+  - Framework: Next.js 16.4.6 (App Router, Turbopack / Webpack).
+  - UI & Estilos: React 19, Tailwind CSS 4, Framer Motion, Lucide Icons.
+  - Base de Datos y Autenticación: Supabase (PostgreSQL managed, Auth, Row Level Security).
+  - Síntesis y Reconocimiento de Voz: Web Speech API nativa (TTS & STT en cliente).
+  - Despliegue e Infraestructura: Contenedor Docker multi-stage sobre servidor Dokploy
+    (IP pública: 155.133.197.176 / Dominio: nativa.155.133.197.176.sslip.io).
+  - Integraciones de IA: Soporte multi-proveedor para Google Gemini, Groq, OpenAI,
+    Cerebras, Mistral, DeepSeek, OpenRouter, Cohere y Cloudflare AI.
+
+* Diagnóstico Global:
+  - Nivel Funcional: MUY ALTO (Plataforma rica en interactividad, audio multi-velocidad,
+    shadowing con reconocimiento de voz, rúbricas pedagógicas automatizadas y gamificación).
+  - Postura de Seguridad: VULNERABLE. Existen fallas severas en las políticas de seguridad
+    de base de datos (RLS), validación de sesiones administrativas por cookies manipulables,
+    almacenamiento de contraseñas en LocalStorage y endpoints de inteligencia artificial
+    desprovistos de autenticación y límites de consumo.
+
+================================================================================
+2. INVENTARIO DE FUNCIONALIDADES VISIBLES (EXPERIENCIA DEL ESTUDIANTE)
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1. LANDING PAGE Y ACCESO PRINCIPAL (Ruta: /)
+--------------------------------------------------------------------------------
+- Sección Hero: Propuesta de valor ("Adquiere inglés real sin traducir mentalmente").
+  Acceso directo al registro y prueba gratuita.
+- Explicación del Método SLA Krashen: Visualización pedagógica del filtro afectivo,
+  adquisición vs aprendizaje consciente y el principio del orden natural.
+- Comparativa Nativa vs Métodos Tradicionales: Tabla interactiva frente a apps
+  basadas en gramática memorística (Duolingo, OpenEnglish, métodos tradicionales).
+- Selector de Rutas: Ruta Universitaria (A1-C2) vs Ruta Laboral Call Center BPO.
+- Tabla de Precios y Planes: Plan Gratuito (Fundamentos) vs Plan Pro Anual/Mensual
+  con pasarela informativa y acceso a licencias.
+- Modal de Acceso Unificado (AuthModal):
+  * Pestaña de Registro con nombre, email, contraseña y nivel autodeclarado.
+  * Pestaña de Inicio de Sesión con validación automática de credenciales.
+  * Integración con Supabase Auth y sincronización instantánea de sesión.
+  * Detección automática de redirección con error '?error=unauthorized_admin'
+    para abrir automáticamente el modal de login a cuentas administradoras.
+
+--------------------------------------------------------------------------------
+2.2. AUTENTICACIÓN Y ONBOARDING GAMIFICADO
+--------------------------------------------------------------------------------
+- Onboarding Tour Guiado (/learn y /learn/[language]):
+  * Disparo automático para usuarios recién registrados cuya columna
+    'has_seen_tour' sea false en Supabase y LocalStorage.
+  * Overlay oscuro (backdrop 70% opacidad) con Spotlight SVG que ilumina
+    dinámicamente el componente en pantalla.
+  * Recorrido en 6 Pasos:
+    1. Bienvenida al método de adquisición natural.
+    2. Header y estadísticas (racha, XP y nivel actual).
+    3. Mapa de aventura y botón de inicio de lección.
+    4. Widget del Cofre Diario de Vocabulario.
+    5. Misiones diarias y retos de XP.
+    6. Ruta especializada Call Center BPO.
+  * Botón permanente de reinicio de tour (ícono de '?' en la barra superior).
+  * Persistencia bidireccional: actualiza 'has_seen_tour = true' en base de datos.
+
+--------------------------------------------------------------------------------
+2.3. DASHBOARD Y MAPA CURRICULAR UNIVERSITARIO (Ruta: /learn/[language])
+--------------------------------------------------------------------------------
+- Barra Superior de Estado y Gamificación:
+  * Contador de Racha en días activos.
+  * Contador de Puntos de Experiencia (XP) acumulados.
+  * Tiempo total de inmersión auditiva en minutos.
+  * Selector de Idioma de Estudio (Soporte multi-lenguaje: Inglés, Francés, etc.).
+  * Selector de Acento de Audio (Inglés Americano US, Británico UK, Australiano AU).
+- Selector de Modos de Vista:
+  * Botón 1: 'Ruta' (Mapa de Nodos Curriculares).
+  * Botón 2: 'Inmersión' (Biblioteca Krashen de lectura extensiva).
+  * Botón 3: 'Temario' (Syllabus de niveles MCER).
+  * Botón 4: 'Taller' (Laboratorio de proyectos de escritura).
+  * Botón 5: 'SRS' (Repaso espaciado de vocabulario).
+- Mapa Curricular de Nodos (24 Unidades Didácticas A1 a C2):
+  * Filtrado por nivel: Todos (24), A1 Fundamentos, A2 Comunicación, B1 Independencia,
+    B2 Académico, C1 Avanzado, C2 Maestría.
+  * Control de Desbloqueo Secuencial: Los nodos permanecen bloqueados hasta
+    que el nodo previo es completado con éxito.
+  * Fichas de Unidad: Título, proyecto universitario asignado, meta comunicativa
+    y botón de inicio inmersivo.
+- Radar de Destrezas SLA:
+  * Medidores de adquisición para Listening, Speaking, Reading y Writing.
+- Misiones Diarias (Daily Quests):
+  * 3 metas diarias (leer un artículo, completar repaso SRS, grabar shadowing).
+  * Bono de +50 XP al completar todas las misiones del día.
+
+--------------------------------------------------------------------------------
+2.4. CORREDOR DE LECCIONES INTERACTIVO (Componente: LessonRunner.tsx)
+--------------------------------------------------------------------------------
+Estructura curricular de 6 etapas pedagógicas sin traducción mental:
+- Header de Control:
+  * Barra de progreso segmentada en 6 pasos.
+  * Atajos de teclado: [Espacio] reproducir audio, [1-4] responder, [Enter] continuar.
+  * Selector de Velocidad de Audio Multi-Escala: '0.75x', '0.85x', '1.0x', '1.25x'
+    con actualización en caliente en cualquier etapa de la lección.
+
+- ETAPA 1: Inmersión Sonora Extensa (Chat Conversacional Vivo):
+  * Presentación de la escena contextual y objetivo comunicativo.
+  * Modo 'Todo el Diálogo' continuo con botones de Pausar, Reanudar y Detener.
+  * Reproducción línea por línea con variación de tono (estudiante vs interlocutor).
+  * Control de audio individual por frase con estados visuales: Animación de onda
+    mientras suena, botón de Pausa y botón de Reanudar.
+  * Botón Frase Estrella (⭐) para guardar cualquier oración directamente en el mazo SRS.
+  * Toggle 'Ver Español' / 'Ocultar Español' para forzar la adquisición directa.
+  * Toggle 'Apoyo Fonético' con transcripciones aproximadas.
+
+- ETAPA 2: Comprensión Auditiva Gist:
+  * Pasaje de audio contextual con reproductor completo (Play, Pausa, Reanudar, Stop).
+  * Pregunta de deducción global sin penalización punitiva.
+
+- ETAPA 3: Sintaxis y Automatización:
+  * Opción A: Sentence Builder (Banco magnético de tokens desordenados para armar
+    la estructura en orden natural).
+  * Opción B: Story Sequencing (Ordenamiento cronológico de eventos del diálogo).
+
+- ETAPA 4: Shadowing Studio (Laboratorio Fonético):
+  * Frases de práctica calibradas por nivel.
+  * Modelo nativo con botón de Escuchar, Pausar y Detener.
+  * Transcripción fonética IPA técnica y apoyo figurado.
+  * Grabación de voz en tiempo real mediante Web Speech API.
+  * Evaluación fonética automática con porcentaje de coincidencia y feedback de fluidez.
+
+- ETAPA 5: Noticing Comunicativo (Atención Consciente):
+  * Módulo voluntario de baja ansiedad.
+  * Análisis pragmático: "¿Por qué se dice así?".
+  * Elección pragmática sobre la intención del hablante sin penalización.
+
+- ETAPA 6: Reto de Maestría y Desbloqueo:
+  * Pregunta final comunicativa.
+  * Animación de victoria con efectos sonoros, adjudicación de XP y desbloqueo del
+    siguiente nodo en el mapa curricular.
+
+--------------------------------------------------------------------------------
+2.5. BIBLIOTECA DE INMERSIÓN MASIVA (Componente: ImmersionViewer.tsx)
+--------------------------------------------------------------------------------
+- Catálogo de historias graduadas ricas en contexto (200 a 450 palabras).
+- Filtros por niveles MCER (A1 a C2).
+- Lector enfocado con tipografía limpia, sin distracciones.
+- Barra de control de audio nativo integrada:
+  * Botón 'Escuchar Narración Completa' / 'Pausar Narración' / 'Reanudar Narración'.
+  * Botón de Detener y reiniciar audio.
+  * Selector de velocidad ('0.75x', '0.85x', '1.0x', '1.25x').
+- Spotlight de Vocabulario Reciclado en Contexto:
+  * Glosario interactivo con fonética IPA y definiciones situacionales.
+- Contador de tiempo de lectura y registro de minutos de inmersión auditiva.
+
+--------------------------------------------------------------------------------
+2.6. TALLER UNIVERSITARIO DE ESCRITURA Y PROYECTOS TBLT
+--------------------------------------------------------------------------------
+- Editor de redacción de ensayos de fin de unidad.
+- Conteo de palabras en tiempo real contra el rango sugerido (ej. 80-150 palabras).
+- Lista de verificación de palabras clave requeridas en el texto.
+- Evaluación Pedagógica con IA mediante Rúbricas Oxford/Cambridge:
+  1. Task Achievement (Cumplimiento de la tarea comunicativa, 0-25 pts).
+  2. Coherence & Cohesion (Estructura lógica y conectores, 0-25 pts).
+  3. Lexical Resource (Vocabulario apropiado al nivel, 0-25 pts).
+  4. Grammatical Accuracy (Precisión de estructuras gramaticales, 0-25 pts).
+- Calificación consolidada (0 a 100) y 3 consejos prácticos específicos de mejora.
+
+--------------------------------------------------------------------------------
+2.7. COFRE DIARIO DE VOCABULARIO (Componente: DailyVocabularyModal.tsx)
+--------------------------------------------------------------------------------
+- Entrega diaria de 3 palabras clave en oraciones contextuales.
+- Reproducción sonora con control de velocidad rápida (0.75x, 0.85x, 1.0x, 1.25x)
+  y botones de alternancia entre Play, Pausa y Reanudar.
+- Botón de reclamación diaria con recompensa de +15 XP.
+- Pestaña de Reto Semanal de Escritura: Redacción de ensayo integrando las palabras
+  de la semana con evaluación automática por IA.
+
+--------------------------------------------------------------------------------
+2.8. SISTEMA DE REPETICIÓN ESPACIADA (SRS FLASHCARDS)
+--------------------------------------------------------------------------------
+- Mazo inteligente de tarjetas de memoria basado en el algoritmo SM-2.
+- Mecánica de giro interactivo (anverso en inglés con audio, reverso con significado).
+- Calificación de retención: 'Fácil', 'Bien', 'Difícil' para programar el próximo
+  intervalo de repaso.
+- Inclusión automática de Frases Estrella marcadas durante las lecciones.
+
+--------------------------------------------------------------------------------
+2.9. RUTA ESPECIALIZADA CALL CENTER BPO (Ruta: /learn/[language]/[track])
+--------------------------------------------------------------------------------
+- Currículo especializado para agentes de servicio al cliente y BPO en inglés:
+  * Protocolos de saludo y empatía inicial.
+  * Técnicas de retención y 'Hold Procedure'.
+  * Manejo y desescalación de clientes frustrados (De-escalation techniques).
+  * Verificación de seguridad y políticas de privacidad (HIPAA / PCI-DSS).
+  * Solución técnica de problemas paso a paso.
+- Simulador interactivo de llamadas con escenarios reales.
+
+--------------------------------------------------------------------------------
+2.10. HERRAMIENTAS AUXILIARES
+--------------------------------------------------------------------------------
+- Placement Test (/components/placement-test-modal.tsx):
+  * Examen diagnóstico con audios y preguntas progresivas para determinar el nivel
+    de entrada del alumno (A1 a C2).
+- Biblioteca Temática (/components/topic-library-modal.tsx):
+  * Selección de diálogos y situaciones cotidianas agrupadas por tópicos.
+- Cajón de Perfil y Preferencias:
+  * Configuración de acento, metas de estudio y personalización de avatar.
+
+================================================================================
+3. INVENTARIO DE FUNCIONALIDADES NO VISIBLES / BACKEND / OCULTAS
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1. PANEL MAESTRO DE ADMINISTRACIÓN (Ruta: /admin)
+--------------------------------------------------------------------------------
+Este módulo cuenta con más de 3,500 líneas de código y ofrece control total
+sobre el sistema educativo, pero está oculto al estudiante común:
+- Pestaña 'CONTENT' (Editor Curricular):
+  * Creación y edición en caliente de unidades, lecciones y sub-nodos.
+  * Editor de diálogos interactivos, audios, preguntas y opciones de respuesta.
+- Pestaña 'OVERVIEW' (Métricas Globales):
+  * Estadísticas de retención, estudiantes activos, lecciones completadas y horas de audio.
+- Pestaña 'LANGUAGES' (Registro Multi-Idioma):
+  * Creación de cursos en otros idiomas (Francés, Alemán, Italiano, Portugués, etc.)
+    mediante plantillas curriculares automatizadas.
+- Pestaña 'AI TOOLS' (Generador Masivo de Contenido):
+  * Generación de historias de inmersión, lecciones completas y baterías de
+    preguntas utilizando modelos de lenguaje (LLM).
+- Pestaña 'AI LIBRARY' (Content Lake):
+  * Banco centralizado de historias generadas por IA.
+  * Flujo de moderación y aprobación manual/automática ('approved' / 'rejected').
+- Pestaña 'API KEYS':
+  * Consola de gestión y prueba de conectividad de llaves para 10 proveedores de IA:
+    Gemini, Groq, OpenAI, Anthropic, Cerebras, Mistral, DeepSeek, Cohere, Cloudflare y ElevenLabs.
+- Pestaña 'GLOBAL CONFIG' (Monetización y Licencias B2B):
+  * Interruptor maestro de Paywall (Activar/Desactivar cobro en la plataforma).
+  * Aprobación y rechazo de solicitudes de pago manuales por transferencia/banco.
+  * Generador de códigos de licencia empresariales B2B con número máximo de canjes.
+
+--------------------------------------------------------------------------------
+3.2. PANEL CORPORATIVO B2B (Ruta: /admin/company/[code])
+--------------------------------------------------------------------------------
+- Dashboard multi-tenant diseñado para empresas que capacitan a sus equipos en Nativa:
+  * Monitoreo del progreso de empleados o agentes asignados bajo un código corporativo.
+  * Reportes de horas de inmersión y métricas de desempeño BPO.
+
+--------------------------------------------------------------------------------
+3.3. RUTAS DE SERVIDOR Y ENDPOINTS DE API (/api/*)
+--------------------------------------------------------------------------------
+1. POST /api/ai/proxy:
+   - Actúa como puente entre el cliente y las APIs de IA para generar historias Krashen.
+   - Inyecta prompts pedagógicos del sistema para estructurar JSON con vocabulario y fonética.
+2. POST /api/ai/evaluate-project:
+   - Recibe redacciones de alumnos, procesa la rúbrica Oxford/Cambridge con el modelo
+     seleccionado y guarda el resultado en la tabla 'project_submissions' de Supabase.
+3. POST /api/ai/test-key:
+   - Realiza llamadas de prueba a las APIs de IA, midiendo latencia y cuota disponible.
+4. POST /api/progress/sync:
+   - Validador en servidor de la cadena de prerrequisitos curriculares.
+   - Previene trampas: comprueba que no se puedan reclamar nodos avanzados sin
+     haber completado los anteriores en orden secuencial.
+   - Limita el XP a un máximo matemáticamente coherente para evitar inyecciones.
+   - Realiza upsert en 'user_progress' y 'profiles' en Supabase.
+
+--------------------------------------------------------------------------------
+3.4. CAPA DE BASE DE DATOS SUPABASE (Esquema: web/supabase_schema.sql)
+--------------------------------------------------------------------------------
+- Tablas creadas en PostgreSQL:
+  1. 'profiles': Datos de usuario, nivel actual, XP, racha, is_admin, is_premium, has_seen_tour.
+  2. 'user_progress': Arrays de nodos completados, minutos de inmersión y misiones diarias.
+  3. 'global_stories': Content Lake de historias Krashen con vocabulario y contador de lecturas.
+  4. 'project_submissions': Historial de ensayos evaluados y desglose de rúbricas.
+  5. 'global_vocabulary': Repositorio léxico A1-C2 con oraciones contextuales.
+  6. 'user_vocabulary': Vocabulario adquirido por usuario y control de retos semanales.
+- Función y Trigger 'handle_new_user()':
+  * Función PL/pgSQL ejecutada automáticamente con privilegios de 'SECURITY DEFINER'
+    cuando un usuario se registra en 'auth.users'. Crea el registro inicial en 'profiles'
+    y 'user_progress', asignando 'is_admin = true' si el correo es 'adohuken2005@gmail.com'.
+
+--------------------------------------------------------------------------------
+3.5. ARQUITECTURA RESIDUAL / CÓDIGO PARALELO (NestJS & Prisma en la Raíz)
+--------------------------------------------------------------------------------
+- En la raíz del repositorio existen carpetas 'src/', 'dist/' y 'prisma/':
+  * Módulos NestJS: Auth, Lessons, Progress con Guards y Decorators de Passport JWT.
+  * Esquema Prisma (prisma/schema.prisma): Modelos de 'User', 'Profile', 'RefreshToken',
+    'Language', 'CourseModule', 'Lesson', 'UserSkillMastery', 'SpeakingHistory'.
+  * Estado: Código inactivo en producción. La imagen Docker de Dokploy solo compila
+    la carpeta 'web/'. Sin embargo, este código contiene modelos completos que no
+    están conectados a la base de datos de producción actual.
+
+================================================================================
+4. AUDITORÍA DE SEGURIDAD Y MATRIZ DE VULNERABILIDADES
+================================================================================
+
+A continuación se detallan las vulnerabilidades identificadas durante la revisión
+estática y dinámica del código fuente, ordenadas por criticidad:
+
+--------------------------------------------------------------------------------
+4.1. VULN-01 [CRÍTICA]: POLÍTICAS RLS PERMISIVAS EN SUPABASE (BYPASS DE PRIVILEGIOS)
+--------------------------------------------------------------------------------
+* Ubicación: web/supabase_schema.sql (Líneas 180 a 210 y 245 a 257)
+* Descripción Técnica:
+  Las políticas de Row Level Security (RLS) contienen cláusulas 'OR id IS NOT NULL'
+  u 'OR user_id IS NOT NULL' otorgadas a los roles 'anon' y 'authenticated':
+  
+  Ejemplo en 'profiles':
+  CREATE POLICY "Los usuarios pueden actualizar su propio perfil" 
+    ON public.profiles FOR UPDATE 
+    TO authenticated, anon
+    USING (auth.uid() = id OR id IS NOT NULL)
+    WITH CHECK (auth.uid() = id OR id IS NOT NULL);
+
+* Impacto:
+  Dado que 'id' es la clave primaria UUID de la tabla y NUNCA es nulo, la condición
+  'id IS NOT NULL' siempre evalúa a TRUE. Esto significa que cualquier usuario anónimo
+  o cualquier alumno registrado puede enviar un request UPDATE directo a Supabase
+  usando la anon key pública y modificar CUALQUIER registro de la base de datos,
+  pudiendo ejecutar:
+  UPDATE profiles SET is_admin = true, is_premium = true WHERE email = 'cualquier_correo@...';
+  Esto otorga privilegios totales de superusuario a cualquier atacante.
+
+* Severidad: CRÍTICA (CVSS 9.8)
+
+--------------------------------------------------------------------------------
+4.2. VULN-02 [ALTA]: ALMACENAMIENTO DE CONTRASEÑA EN TEXTO PLANO EN LOCALSTORAGE
+--------------------------------------------------------------------------------
+* Ubicación: web/src/lib/storage.ts (Líneas 541-557)
+* Descripción Técnica:
+  La función 'updatePassword' y 'verifyCurrentPassword' almacena la contraseña
+  del usuario en texto claro en el almacenamiento local del navegador:
+  localStorage.setItem('fluentia_user_credentials', newPassword);
+
+* Impacto:
+  Cualquier ataque de Cross-Site Scripting (XSS), script de terceros o extensión
+  maliciosa instalada en el navegador de los alumnos o administradores puede
+  leer directamente la clave en texto sin cifrar mediante 'localStorage.getItem(...)'.
+
+* Severidad: ALTA (CVSS 7.5)
+
+--------------------------------------------------------------------------------
+4.3. VULN-03 [ALTA]: FALSIFICACIÓN DE COOKIE EN MIDDLEWARE ADMINISTRATIVO
+--------------------------------------------------------------------------------
+* Ubicación: web/src/middleware.ts (Líneas 13-22)
+* Descripción Técnica:
+  El middleware que custodia las rutas '/admin' y '/admin/company/*' valida el
+  acceso comprobando únicamente si existe una cookie de texto:
+  const adminSessionCookie = request.cookies.get('nativa_admin_session')?.value;
+  if (!adminSessionCookie || adminSessionCookie !== 'true') { ... }
+
+* Impacto:
+  Cualquier persona puede abrir la consola de desarrollador del navegador (F12) y escribir:
+  document.cookie = "nativa_admin_session=true; path=/;";
+  Con esto, el middleware permite el acceso hacia la ruta '/admin'. Si bien la página
+  realiza una segunda validación con Supabase, si Supabase no está configurado o falla
+  la conexión de red, la página /admin tiene como fallback:
+  if (!client || !isSupabaseConfigured) { setIsAdminAuthorized(true); }
+  otorgando acceso completo a la interfaz administrativa.
+
+* Severidad: ALTA (CVSS 8.2)
+
+--------------------------------------------------------------------------------
+4.4. VULN-04 [ALTA]: ENDPOINTS DE IA EXPUESTOS SIN AUTENTICACIÓN NI RATE LIMITING
+--------------------------------------------------------------------------------
+* Ubicación:
+  - web/src/app/api/ai/proxy/route.ts
+  - web/src/app/api/ai/evaluate-project/route.ts
+  - web/src/app/api/ai/test-key/route.ts
+* Descripción Técnica:
+  Los métodos POST de estas rutas no validan tokens de autorización (Bearer Token /
+  Supabase JWT) ni identifican la sesión del usuario que realiza la petición. Tampoco
+  poseen limitadores de peticiones por minuto (Rate Limiting).
+* Impacto:
+  Cualquier usuario o bot externo puede enviar peticiones masivas a estos endpoints
+  utilizando las API keys del servidor (Gemini, Groq, OpenAI, etc.) de forma gratuita,
+  agotando las cuotas de tokens, bloqueando el servicio para alumnos legítimos o
+  generando sobrecostos económicos en las cuentas de IA asociadas.
+
+* Severidad: ALTA (CVSS 7.6)
+
+--------------------------------------------------------------------------------
+4.5. VULN-05 [ALTA]: TOKEN PERSONAL DE GITHUB ACTIVO EN CONFIGURACIÓN GIT Y SCRIPTS
+--------------------------------------------------------------------------------
+* Ubicación:
+  - .git/config (Remote URL de git)
+  - subir_con_token.bat (Rastreado en el repositorio)
+* Descripción Técnica:
+  La URL remota configurada en git contiene un Personal Access Token (PAT) con
+  privilegios sobre el repositorio 'adohuken/nativa'.
+* Impacto:
+  Si la carpeta '.git' llega a exponerse en un servidor web o en un respaldo público,
+  el atacante obtendría control de lectura y escritura sobre el repositorio de código,
+  pudiendo inyectar código malicioso en la rama principal.
+
+* Severidad: ALTA (CVSS 8.4)
+
+--------------------------------------------------------------------------------
+4.6. VULN-06 [MEDIA]: CREDENCIALES ANON EN DOCKERFILE BUILD ARGS
+--------------------------------------------------------------------------------
+* Ubicación: Dockerfile (Líneas 18-19)
+* Descripción Técnica:
+  Las variables 'NEXT_PUBLIC_SUPABASE_URL' y 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+  están escritas de forma estática en las instrucciones ARG del Dockerfile.
+* Impacto:
+  Cualquiera con acceso a la imagen Docker en un registro público o inspeccionando
+  las capas del contenedor puede extraer las claves de Supabase. Al combinarse con la
+  falla VULN-01 (RLS roto), esto expone la base de datos completa.
+
+* Severidad: MEDIA (CVSS 5.3)
+
+--------------------------------------------------------------------------------
+4.7. VULN-07 [MEDIA]: ENDPOINT DE PROGRESO SUSCEPTIBLE A IDOR (OVERWRITE DE PROGRESO)
+--------------------------------------------------------------------------------
+* Ubicación: web/src/app/api/progress/sync/route.ts (Línea 18)
+* Descripción Técnica:
+  El endpoint recibe 'userId' como parámetro en el cuerpo JSON y actualiza directamente
+  el progreso sin verificar si el usuario que emitió la petición es el propietario de ese UUID.
+* Impacto:
+  Un usuario malicioso que conozca el UUID de otro estudiante puede sobrescribir
+  su progreso, XP y rachas enviando peticiones arbitrarias al endpoint de sincronización.
+
+* Severidad: MEDIA (CVSS 6.5)
+
+--------------------------------------------------------------------------------
+4.8. VULN-08 [MEDIA]: AUSENCIA DE CABECERAS DE SEGURIDAD HTTP
+--------------------------------------------------------------------------------
+* Ubicación: web/src/middleware.ts / web/next.config.ts
+* Descripción Técnica:
+  No se están inyectando cabeceras de endurecimiento web tales como:
+  Content-Security-Policy (CSP), X-Frame-Options (protección Clickjacking),
+  X-Content-Type-Options: nosniff, y Strict-Transport-Security (HSTS).
+* Impacto:
+  Facilita ataques de Clickjacking (embeber Nativa en un iframe malicioso)
+  y reduce las barreras defensivas contra inyecciones de scripts XSS.
+
+* Severidad: MEDIA (CVSS 5.0)
+
+--------------------------------------------------------------------------------
+4.9. VULN-09 [BAJA]: DUPLICIDAD ARQUITECTURAL Y CÓDIGO MUERTO (NESTJS / PRISMA)
+--------------------------------------------------------------------------------
+* Ubicación: Raíz del proyecto (src/, prisma/, dist/, package.json)
+* Descripción:
+  Existen dependencias pesadas (@nestjs/core, bcrypt, passport, prisma) que no son
+  utilizadas en producción, generando confusión operativa y elevando el consumo de disco.
+
+* Severidad: BAJA (CVSS 3.0)
+
+================================================================================
+5. PLAN DE REMEDIACIÓN Y CÓDIGO DE CORRECCIÓN INMEDIATA
+================================================================================
+
+--------------------------------------------------------------------------------
+5.1. SCRIPT SQL CORREGIDO PARA SUPABASE (BLINDAJE DE RLS)
+--------------------------------------------------------------------------------
+Ejecuta el siguiente bloque en el SQL Editor de tu Dashboard de Supabase para
+anular de inmediato las políticas inseguras y restringir cada operación únicamente
+al dueño legítimo autenticado:
+
+```sql
+-- 1. Eliminar políticas inseguras
+DROP POLICY IF EXISTS "Los usuarios pueden ver su propio perfil" ON public.profiles;
+DROP POLICY IF EXISTS "Los usuarios pueden insertar su propio perfil" ON public.profiles;
+DROP POLICY IF EXISTS "Los usuarios pueden actualizar su propio perfil" ON public.profiles;
+DROP POLICY IF EXISTS "Los usuarios pueden ver su propio progreso" ON public.user_progress;
+DROP POLICY IF EXISTS "Los usuarios pueden modificar su propio progreso" ON public.user_progress;
+DROP POLICY IF EXISTS "Los usuarios pueden ver su propio vocabulario" ON public.user_vocabulary;
+DROP POLICY IF EXISTS "Los usuarios pueden agregar palabras a su vocabulario" ON public.user_vocabulary;
+DROP POLICY IF EXISTS "Los usuarios pueden actualizar su propio vocabulario" ON public.user_vocabulary;
+
+-- 2. Políticas estrictas para PROFILES
+CREATE POLICY "Lectura estricta de perfil propio o admin"
+  ON public.profiles FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY "Inserción estricta de perfil propio"
+  ON public.profiles FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+-- Impedir que un alumno pueda cambiarse a is_admin = true
+CREATE POLICY "Actualización estricta de perfil propio (sin auto-promoción a admin)"
+  ON public.profiles FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (
+    auth.uid() = id 
+    AND (
+      is_admin = (SELECT p.is_admin FROM public.profiles p WHERE p.id = auth.uid())
+      OR (SELECT email FROM auth.users WHERE id = auth.uid()) = 'adohuken2005@gmail.com'
+    )
+  );
+
+-- 3. Políticas estrictas para USER_PROGRESS
+CREATE POLICY "Lectura estricta de progreso propio"
+  ON public.user_progress FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Modificación estricta de progreso propio"
+  ON public.user_progress FOR ALL
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- 4. Políticas estrictas para USER_VOCABULARY
+CREATE POLICY "Lectura estricta de vocabulario propio"
+  ON public.user_vocabulary FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Inserción estricta de vocabulario propio"
+  ON public.user_vocabulary FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Actualización estricta de vocabulario propio"
+  ON public.user_vocabulary FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+--------------------------------------------------------------------------------
+5.2. CORRECCIÓN DEL MIDDLEWARE DE ADMINISTRACIÓN
+--------------------------------------------------------------------------------
+En lugar de validar un string estático en cookies ('nativa_admin_session=true'),
+el middleware y la página /admin deben validar la firma de la sesión con Supabase Auth
+o utilizar una cookie firmada con HMAC secreto en el servidor.
+
+--------------------------------------------------------------------------------
+5.3. HIGIENIZACIÓN DE CONTRASEÑAS EN LOCALSTORAGE
+--------------------------------------------------------------------------------
+- Eliminar de inmediato las funciones 'updatePassword' y 'verifyCurrentPassword' que
+  almacenan la contraseña en 'localStorage'.
+- Dejar la autenticación y el cambio de contraseña exclusivamente delegados a
+  'supabase.auth.updateUser({ password: newPassword })'.
+
+--------------------------------------------------------------------------------
+5.4. ASEGURAMIENTO DE ENDPOINTS DE INTELIGENCIA ARTIFICIAL
+--------------------------------------------------------------------------------
+En '/api/ai/proxy', '/api/ai/evaluate-project' y '/api/progress/sync':
+- Validar el token Bearer en las cabeceras HTTP:
+  const token = req.headers.get('Authorization')?.replace('Bearer ', '');
+  const { data: { user } } = await supabase.auth.getUser(token);
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+- Asociar 'userId = user.id' forzosamente desde el token verificado, eliminando la
+  vulnerabilidad IDOR.
+
+--------------------------------------------------------------------------------
+5.5. REVOCACIÓN DEL TOKEN DE GITHUB
+--------------------------------------------------------------------------------
+1. Ir a GitHub > Settings > Developer Settings > Personal access tokens.
+2. Revocar de inmediato el token activo 'ghp_qRRQlEq...'.
+3. Generar uno nuevo con caducidad definida (30-90 días) o configurar Git Credential
+   Manager en Windows para autenticarse por navegador sin exponer tokens en texto plano.
+4. Limpiar la URL de git en la máquina local:
+   git remote set-url origin https://github.com/adohuken/nativa.git
+
+================================================================================
+FIN DEL INFORME DE AUDITORÍA
+Documento generado y almacenado en el repositorio: AUDITORIA_SISTEMA_COMPLETA.txt
+================================================================================
