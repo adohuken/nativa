@@ -7,16 +7,38 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { provider, apiKey, model } = body;
 
-    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 5) {
+    const envMap: Record<string, string> = {
+      gemini: 'GEMINI_API_KEY',
+      groq: 'GROQ_API_KEY',
+      cerebras: 'CEREBRAS_API_KEY',
+      openrouter: 'OPENROUTER_API_KEY',
+      openai: 'OPENAI_API_KEY',
+      mistral: 'MISTRAL_API_KEY',
+      deepseek: 'DEEPSEEK_API_KEY',
+      cohere: 'COHERE_API_KEY',
+      cloudflare: 'CLOUDFLARE_AI_TOKEN',
+      elevenlabs: 'ELEVENLABS_API_KEY'
+    };
+
+    let cleanKey = (typeof apiKey === 'string') ? apiKey.trim() : '';
+    let isServerEnvKey = false;
+
+    if (cleanKey.length < 5) {
+      const serverEnvName = envMap[provider?.toLowerCase() || ''];
+      if (serverEnvName && process.env[serverEnvName] && process.env[serverEnvName]!.trim().length > 5) {
+        cleanKey = process.env[serverEnvName]!.trim();
+        isServerEnvKey = true;
+      }
+    }
+
+    if (!cleanKey || cleanKey.length < 5) {
       return NextResponse.json({
         success: false,
-        message: 'La clave API proporcionada está vacía o es demasiado corta.',
+        message: 'No se encontró clave API en el cliente ni en el servidor (.env.local / Dokploy).',
         latencyMs: 0,
         provider
       }, { status: 400 });
     }
-
-    const cleanKey = apiKey.trim();
 
     // 1. Google Gemini
     if (provider === 'gemini') {

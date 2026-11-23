@@ -725,6 +725,9 @@ export function UserProfileModal({
                         try { await client.auth.signOut(); } catch {}
                       }
                       localStorage.removeItem('fluentia_user_session');
+                      localStorage.removeItem('fluentia_user_profile');
+                      localStorage.removeItem('nativa_admin_session');
+                      try { document.cookie = 'nativa_admin_session=; path=/; max-age=0'; } catch {}
                       soundManager.playClick();
                       onClose();
                       if (typeof window !== 'undefined') {

@@ -2,26 +2,26 @@
 
 import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Lock, 
-  CheckCircle2, 
-  Play, 
-  Headphones, 
-  Mic, 
-  BookOpen, 
-  Flame, 
-  ShieldCheck, 
-  Sparkles, 
-  Volume2, 
+import {
+  Lock,
+  CheckCircle2,
+  Play,
+  Headphones,
+  Mic,
+  BookOpen,
+  Flame,
+  ShieldCheck,
+  Sparkles,
+  Volume2,
   VolumeX,
-  ChevronRight, 
-  X, 
-  Award, 
-  Zap, 
-  Compass, 
-  Sliders, 
-  Eye, 
-  EyeOff, 
+  ChevronRight,
+  X,
+  Award,
+  Zap,
+  Compass,
+  Sliders,
+  Eye,
+  EyeOff,
   Trophy,
   Star,
   Check,
@@ -66,7 +66,10 @@ import {
   Italic,
   List,
   Quote,
-  Crown
+  Crown,
+  Gift,
+  Settings,
+  ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -88,10 +91,12 @@ import { RadarSkillsChart } from '@/components/radar-skills-chart';
 import { UserProfileModal } from '@/components/user-profile-modal';
 import { PlacementTestModal } from '@/components/placement-test-modal';
 import { PremiumPaywallModal } from '@/components/premium-paywall-modal';
+import { DailyVocabularyModal } from '@/components/learn';
 import { CertificatesModal } from '@/components/certificates-modal';
 import { APP_NAME } from '@/lib/config';
 import { getSupabaseClient, isSupabaseConfigured, DatabaseProfile } from '@/lib/supabase';
 import { AiConfigService } from '@/lib/ai-config';
+import { LearningMap, ImmersionViewer, SrsGame, LessonRunner } from '@/components/learn';
 
 interface BuilderToken {
   id: string;
@@ -279,6 +284,7 @@ function FluentiaPathContent() {
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
   const [paywallReason, setPaywallReason] = useState<string>('');
   const [isCertificatesModalOpen, setIsCertificatesModalOpen] = useState(false);
+  const [isDailyVocabOpen, setIsDailyVocabOpen] = useState(false);
   const [b2c2AlertModalOpen, setB2c2AlertModalOpen] = useState(false);
   const [b2c2AlertLevel, setB2c2AlertLevel] = useState('B2');
   const [isUserPremium, setIsUserPremium] = useState<boolean>(() => AppStorage.isUserPremium());
@@ -291,7 +297,7 @@ function FluentiaPathContent() {
   const [routeLevelFilter, setRouteLevelFilter] = useState<'ALL' | 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'>('ALL');
 
   // Sección de Inmersión Masiva (Narrow Reading Krasheniano)
-  const [immersionMinutes, setImmersionMinutes] = useState<number>(15);
+  const [immersionMinutes, setImmersionMinutes] = useState<number>(() => AppStorage.getImmersionMinutes(languageId));
   const [selectedImmersionStory, setSelectedImmersionStory] = useState<ImmersionStory | null>(null);
   const [immersionLevelFilter, setImmersionLevelFilter] = useState<string>('ALL');
 
@@ -310,8 +316,8 @@ function FluentiaPathContent() {
   const [srsCardsReviewedCount, setSrsCardsReviewedCount] = useState(0);
 
   // Estado del camino de aprendizaje y progreso (Nodos Madre y Sub-Nodos)
-  const [completedNodeIds, setCompletedNodeIds] = useState<string[]>(['a1-lesson-1']);
-  const [completedSubNodeIds, setCompletedSubNodeIds] = useState<string[]>([]);
+  const [completedNodeIds, setCompletedNodeIds] = useState<string[]>(() => AppStorage.getCompletedNodes(languageId));
+  const [completedSubNodeIds, setCompletedSubNodeIds] = useState<string[]>(() => AppStorage.getCompletedSubNodes(languageId));
   const [activeSubNode, setActiveSubNode] = useState<SubNode | null>(null);
   const [activeLesson, setActiveLesson] = useState<IntensiveLesson | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
@@ -319,11 +325,26 @@ function FluentiaPathContent() {
   const [activePopoverLessonId, setActivePopoverLessonId] = useState<string | null>(null);
   const [hoveredLessonId, setHoveredLessonId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<number>(1); // 1 a 6 pasos
-  const [userXp, setUserXp] = useState(140);
-  const [streakDays, setStreakDays] = useState(2);
-  const [skillScores, setSkillScores] = useState<SkillMasteryScores>({ listening: 65, speaking: 45, reading: 70, writing: 50 });
+  const [userXp, setUserXp] = useState<number>(() => AppStorage.getXp(languageId));
+  const [streakDays, setStreakDays] = useState<number>(() => AppStorage.getStreak(languageId));
+  const [skillScores, setSkillScores] = useState<SkillMasteryScores>(() => AppStorage.getSkillScores(languageId));
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [zenMode, setZenMode] = useState<boolean>(true);
+
+  // Estados para UI / Sidebar Gamer Compacto
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState<boolean>(false);
+  const [slaViewMode, setSlaViewMode] = useState<'BARS' | 'RADAR'>('BARS');
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Reconocimiento de Voz Real (Web Speech API)
   const [spokenTranscript, setSpokenTranscript] = useState<string>('');
@@ -406,7 +427,7 @@ function FluentiaPathContent() {
         localStorage.removeItem('nativa_should_show_placement');
         setIsPlacementTestOpen(true);
       }
-    } catch {}
+    } catch { }
     const savedUser = localStorage.getItem('fluentia_user_session');
     if (savedUser) {
       try {
@@ -479,12 +500,12 @@ function FluentiaPathContent() {
     if (next) soundManager.playClick();
   };
 
-  const handleToggleStarPhrase = (line: { en: string; es: string; phonetic?: string }, lesson: IntensiveLesson) => {
+  const handleToggleStarPhrase = (line: { en: string; es?: string; phonetic?: string }, lesson: IntensiveLesson) => {
     const cleanId = `${lesson.id}-${line.en.slice(0, 16).replace(/[^a-zA-Z0-9]/g, '-')}`;
     const isNowStarred = AppStorage.toggleStarredPhrase({
       id: cleanId,
       en: line.en,
-      es: line.es,
+      es: line.es || '',
       phonetic: line.phonetic,
       context: lesson.step1_dialogue.context,
       lessonId: lesson.id,
@@ -531,13 +552,13 @@ function FluentiaPathContent() {
         };
         setUser(fallbackUser);
         localStorage.setItem('fluentia_user_session', JSON.stringify(fallbackUser));
-        
+
         AppStorage.saveUserProfile({
           ...AppStorage.getUserProfile(),
           name: fullNameInput.trim() || emailInput.split('@')[0] || 'Estudiante Nativa',
           email: fallbackUser.email
         });
-        
+
         soundManager.playVictory();
         setAuthLoading(false);
         if (authMode === 'REGISTER') {
@@ -692,7 +713,7 @@ function FluentiaPathContent() {
 
   const playContinuousDialogue = () => {
     if (!activeLesson || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    
+
     if (isContinuousPlaying) {
       stopContinuousDialogue();
       return;
@@ -935,7 +956,7 @@ function FluentiaPathContent() {
 
     if (isPaywallOn && !isPremium && (isRestrictedLevel || isCallCenterTrack)) {
       setPaywallReason(
-        isCallCenterTrack 
+        isCallCenterTrack
           ? 'El Track de Call Center BPO requiere una suscripción Nativa Premium activa.'
           : `El nivel ${lesson.level} forma parte del plan Nativa Premium (B1 a C2).`
       );
@@ -1550,9 +1571,8 @@ function FluentiaPathContent() {
       )}
 
       {/* ================= SIDEBAR DE CONTROL (Desktop + Mobile Drawer) ================= */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-72 max-w-[85vw] border-r border-slate-800/80 bg-[#090d16] md:bg-[#090d16]/95 backdrop-blur-2xl flex flex-col shrink-0 p-5 space-y-4 overflow-y-auto transition-transform duration-300 ease-in-out ${
-        isMobileDrawerOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
-      }`}>
+      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-72 max-w-[85vw] border-r border-slate-800/80 bg-[#090d16] md:bg-[#090d16]/95 backdrop-blur-2xl flex flex-col shrink-0 p-5 space-y-4 overflow-y-auto transition-transform duration-300 ease-in-out ${isMobileDrawerOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+        }`}>
 
         {/* Brand & Botón Cerrar en Móvil */}
         <div className="flex items-center justify-between">
@@ -1567,36 +1587,19 @@ function FluentiaPathContent() {
           </button>
         </div>
 
-        {/* Navegación al Dashboard & Idioma Activo */}
-        <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#0d131f] border border-slate-800/90 shadow-sm">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="text-xl shrink-0">{currentLanguageEntry.flag}</span>
-            <div className="min-w-0">
-              <span className="text-xs font-black text-white block truncate">{currentLanguageEntry.name}</span>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold block truncate">{currentLanguageEntry.badgeText}</span>
-            </div>
-          </div>
-
-          <Link
-            href="/"
-            onClick={() => soundManager.playClick()}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-[11px] font-bold text-slate-300 hover:text-white transition shadow-xs shrink-0"
-            title="Volver al Selector de Idiomas (Dashboard)"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Hub</span>
-          </Link>
-        </div>
-
-        {/* Perfil de Usuario Clickeable */}
-        <div 
-          onClick={() => { setIsProfileModalOpen(true); soundManager.playClick(); }}
-          className="p-3 rounded-2xl bg-[#0d131f] hover:bg-[#121a2a] border border-slate-800/90 hover:border-emerald-500/50 shadow-sm transition cursor-pointer group"
-          title="Ver y editar mi perfil de estudiante"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl overflow-hidden bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center font-bold font-mono text-base shrink-0 shadow-xs">
+        {/* 1. Header Unificado: Perfil + Nivel + Bandera / Idioma + Menú de Cuenta */}
+        <div className="relative" ref={accountMenuRef}>
+          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition shadow-xs">
+            {/* Avatar + Nombre + Nivel */}
+            <button
+              onClick={() => {
+                setIsAccountMenuOpen(!isAccountMenuOpen);
+                soundManager.playClick();
+              }}
+              className="flex items-center gap-2 min-w-0 text-left cursor-pointer flex-1 group"
+              title="Opciones de cuenta y configuración"
+            >
+              <div className="w-7 h-7 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
                 {userProfile.avatarUrl ? (
                   <img src={userProfile.avatarUrl} alt={userProfile.name} className="w-full h-full object-cover" />
                 ) : (
@@ -1604,311 +1607,358 @@ function FluentiaPathContent() {
                 )}
               </div>
               <div className="overflow-hidden min-w-0">
-                <span className="text-xs font-bold text-slate-200 group-hover:text-emerald-300 block truncate transition">
-                  {userProfile.name}
-                </span>
-                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-bold block truncate">
-                  @{userProfile.username} • {userHighestLevel}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-200 group-hover:text-white block truncate transition">
+                    {userProfile.name}
+                  </span>
+                  {isUserPremium ? (
+                    <span title="Nativa Premium Activo" className="inline-flex items-center">
+                      <Crown className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                    </span>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPaywallReason('Desbloquea los niveles B1 a C2 y todas las funciones PRO.');
+                        setIsPaywallModalOpen(true);
+                        soundManager.playClick();
+                      }}
+                      title="Obtener Nativa Premium (B1-C2)"
+                      className="text-amber-400/70 hover:text-amber-400 hover:scale-110 transition shrink-0"
+                    >
+                      <Crown className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 block truncate">
+                  {userHighestLevel} • @{userProfile.username}
                 </span>
               </div>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLogout();
-              }}
-              title="Cerrar Sesión"
-              className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-rose-950/60 border border-slate-800 text-slate-400 hover:text-rose-400 flex items-center justify-center transition shrink-0"
-            >
-              <LogOut className="w-3.5 h-3.5" />
             </button>
+
+            {/* Bandera / Hub + Botón Ajustes */}
+            <div className="flex items-center gap-1 shrink-0 ml-1.5">
+              <Link
+                href="/dashboard"
+                onClick={() => soundManager.playClick()}
+                className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                title={`Volver a Mi Panel de Estudio (Idioma: ${currentLanguageEntry.name})`}
+              >
+                <span className="text-sm leading-none">{currentLanguageEntry.flag}</span>
+              </Link>
+              <button
+                onClick={() => {
+                  setIsAccountMenuOpen(!isAccountMenuOpen);
+                  soundManager.playClick();
+                }}
+                className={`p-1.5 rounded-lg border transition cursor-pointer ${isAccountMenuOpen ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                title="Menú de Cuenta y Ajustes"
+                aria-expanded={isAccountMenuOpen}
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
+
+          {/* 2. Dropdown de Acciones Secundarias (Test Nivelación, Premium, Certificados, Perfil, Salir) */}
+          <AnimatePresence>
+            {isAccountMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-0 right-0 top-full mt-1.5 z-40 p-1.5 bg-[#0c1017] border border-slate-800 rounded-xl shadow-2xl backdrop-blur-xl space-y-0.5"
+              >
+                <button
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    setIsPlacementTestOpen(true);
+                    soundManager.playClick();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Test de Nivelación</span>
+                  </div>
+                  <span className="text-[9px] font-mono bg-purple-950/60 border border-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded font-bold">
+                    Adaptativo
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    if (!isUserPremium) {
+                      setPaywallReason('Desbloquea los niveles B1 a C2 y soporte IA avanzado.');
+                    }
+                    setIsPaywallModalOpen(true);
+                    soundManager.playClick();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isUserPremium ? 'Suscripción Premium' : 'Obtener Premium'}</span>
+                  </div>
+                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${isUserPremium ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-950/60 border border-amber-500/30 text-amber-300'}`}>
+                    {isUserPremium ? 'ACTIVO' : 'PRO'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    setIsCertificatesModalOpen(true);
+                    soundManager.playClick();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Award className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Mis Certificados</span>
+                  </div>
+                  <span className="text-[9px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
+                    PDF
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    setIsProfileModalOpen(true);
+                    soundManager.playClick();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Mi Perfil</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-slate-400">
+                    Editar
+                  </span>
+                </button>
+
+                <div className="h-px bg-slate-800/80 my-1" />
+
+                <button
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 transition text-left cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Cerrar Sesión</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Acceso Rápido al Test de Nivelación Adaptativo */}
-        <button
-          onClick={() => {
-            setIsPlacementTestOpen(true);
-            soundManager.playClick();
-          }}
-          className="w-full flex items-center justify-between p-2.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/30 text-purple-200 text-xs font-bold transition shadow-sm group cursor-pointer"
-          title="Medir tu nivel MCER de A1 a C2 con 10 preguntas adaptativas"
-        >
-          <div className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-purple-400 group-hover:scale-110 transition" />
-            <span>Test de Nivelación</span>
-          </div>
-          <span className="text-[10px] font-mono bg-purple-900/60 border border-purple-500/30 px-1.5 py-0.5 rounded text-purple-200 font-extrabold">
-            Adaptativo
-          </span>
-        </button>
-
-        {/* Acceso a Nativa Premium o Badge de Estado */}
-        {isUserPremium ? (
-          <div className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-300 text-xs font-bold shadow-sm">
-            <div className="flex items-center gap-2">
-              <Crown className="w-4 h-4 text-amber-400" />
-              <span>Nativa Premium Activo</span>
-            </div>
-            <span className="text-[10px] font-mono bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-200">
-              PRO
-            </span>
-          </div>
-        ) : (
-          <button
-            onClick={() => {
-              setPaywallReason('Desbloquea los niveles B1 a C2, el Track de Call Center BPO y las correcciones de IA ilimitadas.');
-              setIsPaywallModalOpen(true);
-              soundManager.playClick();
-            }}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/10 hover:from-amber-500/30 hover:to-amber-600/20 border border-amber-500/40 text-amber-200 text-xs font-bold transition shadow-sm group cursor-pointer"
-            title="Activar suscripción Premium o canjear licencia B2B"
-          >
-            <div className="flex items-center gap-2">
-              <Crown className="w-4 h-4 text-amber-400 group-hover:scale-110 transition" />
-              <span>Obtener Nativa Premium</span>
-            </div>
-            <span className="text-[10px] font-mono bg-amber-500/30 border border-amber-500/40 px-1.5 py-0.5 rounded text-amber-300 font-extrabold">
-              B1-C2
-            </span>
-          </button>
-        )}
-
-        {/* Acceso a Mis Certificados Oficiales */}
-        <button
-          onClick={() => {
-            setIsCertificatesModalOpen(true);
-            soundManager.playClick();
-          }}
-          className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-yellow-500/5 hover:from-amber-500/25 hover:to-yellow-500/15 border border-amber-500/30 text-amber-200 text-xs font-bold transition shadow-sm group cursor-pointer"
-          title="Ver y descargar mis diplomas y certificados en PDF"
-        >
-          <div className="flex items-center gap-2">
-            <Award className="w-4 h-4 text-amber-400 group-hover:scale-110 transition" />
-            <span>Mis Certificados</span>
-          </div>
-          <span className="text-[10px] font-mono bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded text-amber-300 font-extrabold">
-            PDF
-          </span>
-        </button>
-
-        {/* Selector de Vista Principal: 5 Modos (Ruta, Inmersión, Temario, Proyectos, Repaso) */}
-        <div className="space-y-1.5">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block px-1">
-            Modos de Vista
-          </span>
-          <div className="grid grid-cols-5 gap-1 p-1 bg-[#070a10] rounded-2xl border border-slate-800/80 text-xs shadow-inner">
-            <button
-              onClick={() => {
-                setCurrentView('PATH');
-                setIsMobileDrawerOpen(false);
-                soundManager.playClick();
-              }}
-              className={`py-2 px-1 rounded-xl font-bold transition flex flex-col items-center justify-center gap-1 ${
-                currentView === 'PATH' 
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black shadow-md shadow-emerald-500/25' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
-              }`}
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span className="text-[9px]">Ruta</span>
-            </button>
-            <button
-              onClick={() => {
-                setCurrentView('IMMERSION');
-                setIsMobileDrawerOpen(false);
-                soundManager.playClick();
-              }}
-              className={`py-2 px-1 rounded-xl font-bold transition flex flex-col items-center justify-center gap-1 ${
-                currentView === 'IMMERSION' 
-                  ? 'bg-gradient-to-r from-teal-500 to-cyan-400 text-slate-950 font-black shadow-md shadow-teal-500/25' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="text-[9px]">Inmersión</span>
-            </button>
-            <button
-              onClick={() => {
-                setCurrentView('SYLLABUS');
-                setIsMobileDrawerOpen(false);
-                soundManager.playClick();
-              }}
-              className={`py-2 px-1 rounded-xl font-bold transition flex flex-col items-center justify-center gap-1 ${
-                currentView === 'SYLLABUS' 
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-black shadow-md shadow-cyan-500/25' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
-              }`}
-            >
-              <ListTree className="w-3.5 h-3.5" />
-              <span className="text-[9px]">Temario</span>
-            </button>
-            <button
-              onClick={() => {
-                setCurrentView('PROJECTS');
-                setIsMobileDrawerOpen(false);
-                soundManager.playClick();
-              }}
-              className={`py-2 px-1 rounded-xl font-bold transition flex flex-col items-center justify-center gap-1 ${
-                currentView === 'PROJECTS' 
-                  ? 'bg-gradient-to-r from-purple-500 to-violet-400 text-white font-black shadow-md shadow-purple-500/25' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span className="text-[9px]">Taller</span>
-            </button>
-            <button
-              onClick={() => {
-                setCurrentView('REVIEW');
-                setIsMobileDrawerOpen(false);
-                soundManager.playClick();
-              }}
-              className={`py-2 px-1 rounded-xl font-bold transition flex flex-col items-center justify-center gap-1 ${
-                currentView === 'REVIEW' 
-                  ? 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black shadow-md shadow-amber-500/25' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
-              }`}
-            >
-              <Brain className="w-3.5 h-3.5" />
-              <span className="text-[9px]">SRS</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Estadísticas Compactas en una sola línea horizontal (🔥 Racha | ⚡ XP | ⏱️ Input) */}
-        <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#070b13] border border-slate-800/90 text-xs font-mono shadow-inner">
+        {/* 3. Stats Gamer: Barra horizontal limpia y luminosa */}
+        <div className="flex items-center justify-between px-2 py-1 text-xs font-mono select-none">
           <div className="flex items-center gap-1.5 text-amber-400" title="Racha de estudio diario">
-            <Flame className="w-3.5 h-3.5 fill-current" />
-            <span className="font-bold">{streakDays}d</span>
+            <Flame className="w-3.5 h-3.5 fill-current drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]" />
+            <span className="font-extrabold tracking-tight">{streakDays}d</span>
           </div>
-          <span className="text-slate-800">|</span>
+          <span className="text-slate-700 font-mono text-[11px]">|</span>
           <div className="flex items-center gap-1.5 text-emerald-400" title="Puntos de experiencia acumulados">
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            <span className="font-bold">{userXp} XP</span>
+            <Zap className="w-3.5 h-3.5 fill-current drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+            <span className="font-extrabold tracking-tight">{userXp} XP</span>
           </div>
-          <span className="text-slate-800">|</span>
-          <div className="flex items-center gap-1.5 text-teal-300" title="Minutos de inmersión acumulados">
-            <Headphones className="w-3.5 h-3.5" />
-            <span className="font-bold">{immersionMinutes}m</span>
+          <span className="text-slate-700 font-mono text-[11px]">|</span>
+          <div className="flex items-center gap-1.5 text-cyan-400" title="Minutos de inmersión acumulados">
+            <Headphones className="w-3.5 h-3.5 drop-shadow-[0_0_8px_rgba(6,182,212,0.7)]" />
+            <span className="font-extrabold tracking-tight">{immersionMinutes}m</span>
           </div>
-          {starredPhrases.length > 0 && (
-            <>
-              <span className="text-slate-800">|</span>
-              <div className="flex items-center gap-1 text-amber-300" title="Frases estrella para repaso SRS">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                <span className="font-bold">{starredPhrases.length}</span>
-              </div>
-            </>
-          )}
         </div>
 
-        {/* Gráfico de Radar de Destrezas SLA (Spider Chart - 4 Áreas) */}
-        <div className="p-4 rounded-3xl bg-[#0d131f] border border-slate-800/90 shadow-sm space-y-2.5">
-          <div className="flex items-center justify-between pb-1 border-b border-slate-800/80">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300 font-bold flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-emerald-400" />
-              Destrezas SLA (Radar)
-            </span>
-            <button
-              onClick={toggleSound}
-              title={soundEnabled ? 'Silenciar Efectos de Sonido' : 'Activar Sonido Zen'}
-              className="text-slate-400 hover:text-emerald-400 p-1 rounded-lg transition hover:bg-slate-800"
-            >
-              {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
-            </button>
-          </div>
-
-          {/* Gráfico de Radar SVG Polígono Translúcido Verde/Cian */}
-          <RadarSkillsChart scores={skillScores} />
-        </div>
-
-        {/* Tarjeta de Misión Diaria Gamificada */}
-        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-[#0d131f] to-[#090d16] border border-amber-500/30 shadow-md space-y-2.5">
+        {/* 4. Misión Diaria Gamer (Elemento llamativo destacado para no perder la racha) */}
+        <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500/10 via-slate-900/90 to-slate-950 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.08)] space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black flex items-center gap-1.5">
-              <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]" />
               Misión Diaria
             </span>
-            <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full shadow-xs">
+            <span className="text-[10px] font-mono font-extrabold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded-full shadow-xs">
               +30 XP
             </span>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <p className="text-xs text-white font-bold leading-snug">
               Potencia tu {bottleneckSkill.name.split(' ')[0]}
             </p>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Completa una sesión activa de Repaso SRS o práctica de voz para consolidar tu racha.
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Consolida tu racha hoy con práctica activa de repaso SRS o voz.
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              setCurrentView('REVIEW');
-              soundManager.playClick();
-            }}
-            className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            <span>Iniciar Práctica SRS / Voz</span>
-          </button>
-        </div>
-
-        {/* Regla Pedagógica */}
-        <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
-          <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Filtro Afectivo Zen</span>
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <button
+              onClick={() => {
+                setCurrentView('REVIEW');
+                soundManager.playClick();
+              }}
+              className="flex-1 py-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Iniciar Práctica</span>
+            </button>
+            <button
+              onClick={() => {
+                setIsDailyVocabOpen(true);
+                soundManager.playClick();
+              }}
+              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-850 border border-amber-500/30 text-amber-300 transition shrink-0 cursor-pointer"
+              title="Cofre de Palabras Diarias (+15 XP)"
+            >
+              <Gift className="w-4 h-4 text-amber-400" />
+            </button>
           </div>
-          <p className="text-[10px] text-slate-400 leading-relaxed">
-            Sin vidas punitivas ni estrés. Avanza a tu propio ritmo con input comprensible.
-          </p>
         </div>
 
-        {/* Resumen de Módulos */}
-        <div className="flex-1 space-y-2 pt-1">
+        {/* 5. Selector de Vista Principal: 5 Modos con estilo sutil gamer */}
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block px-1">
+            Modos de Vista
+          </span>
+          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-900/60 rounded-xl border border-slate-800/80 text-xs shadow-inner">
+            {[
+              { id: 'PATH', label: 'Ruta', icon: MapPin },
+              { id: 'IMMERSION', label: 'Inmersión', icon: BookOpen },
+              { id: 'SYLLABUS', label: 'Temario', icon: ListTree },
+              { id: 'PROJECTS', label: 'Taller', icon: FileText },
+              { id: 'REVIEW', label: 'SRS', icon: Brain },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = currentView === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setCurrentView(tab.id as any);
+                    setIsMobileDrawerOpen(false);
+                    soundManager.playClick();
+                  }}
+                  className={`py-1.5 px-1 rounded-lg font-bold transition flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                    isActive
+                      ? 'bg-slate-800 text-white font-black shadow-xs border border-slate-700/80'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="text-[9px]">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 6. Destrezas SLA Compactas: 4 Barras Horizontales con Toggle a Radar */}
+        <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <div className="flex items-center justify-between pb-1 border-b border-slate-800/80">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300 font-bold flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              Destrezas SLA
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setSlaViewMode(slaViewMode === 'BARS' ? 'RADAR' : 'BARS')}
+                className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                title="Alternar entre barras y gráfico radar"
+              >
+                {slaViewMode === 'BARS' ? 'Radar' : 'Barras'}
+              </button>
+              <button
+                onClick={toggleSound}
+                title={soundEnabled ? 'Silenciar Efectos de Sonido' : 'Activar Sonido Zen'}
+                className="text-slate-400 hover:text-emerald-400 p-0.5 rounded transition hover:bg-slate-800 cursor-pointer"
+              >
+                {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
+              </button>
+            </div>
+          </div>
+
+          {slaViewMode === 'BARS' ? (
+            <div className="space-y-1.5 pt-0.5">
+              {[
+                { label: 'Listening', score: skillScores.listening, color: 'bg-emerald-400', textColor: 'text-emerald-400', icon: Headphones },
+                { label: 'Speaking', score: skillScores.speaking, color: 'bg-cyan-400', textColor: 'text-cyan-400', icon: Mic },
+                { label: 'Reading', score: skillScores.reading, color: 'bg-sky-400', textColor: 'text-sky-400', icon: BookOpen },
+                { label: 'Writing', score: skillScores.writing, color: 'bg-purple-400', textColor: 'text-purple-400', icon: FileText },
+              ].map((skill) => (
+                <div key={skill.label} className="space-y-0.5">
+                  <div className="flex items-center justify-between text-[10px] font-mono">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <skill.icon className={`w-3 h-3 ${skill.textColor}`} />
+                      {skill.label}
+                    </span>
+                    <span className={`font-bold ${skill.textColor}`}>{skill.score}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${skill.color} rounded-full transition-all duration-500`}
+                      style={{ width: `${Math.min(100, Math.max(5, skill.score))}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="origin-top scale-90 py-1">
+              <RadarSkillsChart scores={skillScores} />
+            </div>
+          )}
+        </div>
+
+        {/* 7. Módulos Oficiales (A1 → C2) */}
+        <div className="space-y-1.5 pt-1">
           <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block px-1">
             Módulos Oficiales (A1 → C2)
           </span>
-          {[
-            { lvl: 'Módulo 1: A1 Fundamentos', code: 'A1', done: `${completedNodeIds.filter(id => id.startsWith('a1')).length}/4`, active: true, color: 'text-emerald-400', activeBg: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-bold shadow-sm', dot: 'bg-emerald-400' },
-            { lvl: 'Módulo 2: A2 Comunicación', code: 'A2', done: `${completedNodeIds.filter(id => id.startsWith('a2')).length}/4`, active: completedNodeIds.includes('a1-lesson-4'), color: 'text-cyan-400', activeBg: 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 font-bold shadow-sm', dot: 'bg-cyan-400' },
-            { lvl: 'Módulo 3: B1 Independencia', code: 'B1', done: `${completedNodeIds.filter(id => id.startsWith('b1')).length}/4`, active: completedNodeIds.includes('a2-lesson-4'), color: 'text-blue-400', activeBg: 'bg-blue-500/15 border-blue-500/40 text-blue-300 font-bold shadow-sm', dot: 'bg-blue-400' },
-            { lvl: 'Módulo 4: B2 Académico', code: 'B2', done: `${completedNodeIds.filter(id => id.startsWith('b2')).length}/4`, active: completedNodeIds.includes('b1-lesson-4'), color: 'text-purple-400', activeBg: 'bg-purple-500/15 border-purple-500/40 text-purple-300 font-bold shadow-sm', dot: 'bg-purple-400' },
-            { lvl: 'Módulo 5: C1 Avanzado EAP', code: 'C1', done: `${completedNodeIds.filter(id => id.startsWith('c1')).length}/4`, active: completedNodeIds.includes('b2-lesson-4'), color: 'text-rose-400', activeBg: 'bg-rose-500/15 border-rose-500/40 text-rose-300 font-bold shadow-sm', dot: 'bg-rose-400' },
-            { lvl: 'Módulo 6: C2 Maestría Doctoral', code: 'C2', done: `${completedNodeIds.filter(id => id.startsWith('c2')).length}/4`, active: completedNodeIds.includes('c1-lesson-4'), color: 'text-amber-400', activeBg: 'bg-amber-500/15 border-amber-500/40 text-amber-300 font-bold shadow-sm', dot: 'bg-amber-400' },
-          ].map((item, idx) => {
-            const isSelected = routeLevelFilter === item.code && currentView === 'PATH';
-            return (
-              <button
-                key={idx}
-                onClick={() => {
-                  setRouteLevelFilter(item.code as any);
-                  setCurrentView('PATH');
-                  soundManager.playClick();
-                }}
-                className={`w-full flex items-center justify-between text-xs p-2.5 rounded-xl border transition text-left ${
-                  isSelected
-                    ? `${item.activeBg}`
-                    : 'bg-[#0d131f] border-slate-800/80 hover:bg-[#121a2c] text-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  {item.active ? (
-                    <div className={`w-2 h-2 rounded-full ${item.dot}`} />
-                  ) : (
-                    <Lock className="w-3 h-3 text-slate-500" />
-                  )}
-                  <span className={item.active ? (isSelected ? 'font-bold' : item.color) : 'text-slate-500'}>
-                    {item.lvl}
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono text-slate-400">{item.done}</span>
-              </button>
-            );
-          })}
+          <div className="space-y-1">
+            {[
+              { lvl: 'Módulo 1: A1 Fundamentos', code: 'A1', done: `${completedNodeIds.filter(id => id.startsWith('a1')).length}/4`, active: true, dot: 'bg-emerald-400' },
+              { lvl: 'Módulo 2: A2 Comunicación', code: 'A2', done: `${completedNodeIds.filter(id => id.startsWith('a2')).length}/4`, active: completedNodeIds.includes('a1-lesson-4'), dot: 'bg-cyan-400' },
+              { lvl: 'Módulo 3: B1 Independencia', code: 'B1', done: `${completedNodeIds.filter(id => id.startsWith('b1')).length}/4`, active: completedNodeIds.includes('a2-lesson-4'), dot: 'bg-blue-400' },
+              { lvl: 'Módulo 4: B2 Académico', code: 'B2', done: `${completedNodeIds.filter(id => id.startsWith('b2')).length}/4`, active: completedNodeIds.includes('b1-lesson-4'), dot: 'bg-purple-400' },
+              { lvl: 'Módulo 5: C1 Avanzado EAP', code: 'C1', done: `${completedNodeIds.filter(id => id.startsWith('c1')).length}/4`, active: completedNodeIds.includes('b2-lesson-4'), dot: 'bg-rose-400' },
+              { lvl: 'Módulo 6: C2 Maestría Doctoral', code: 'C2', done: `${completedNodeIds.filter(id => id.startsWith('c2')).length}/4`, active: completedNodeIds.includes('c1-lesson-4'), dot: 'bg-amber-400' },
+            ].map((item, idx) => {
+              const isSelected = routeLevelFilter === item.code && currentView === 'PATH';
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setRouteLevelFilter(item.code as any);
+                    setCurrentView('PATH');
+                    soundManager.playClick();
+                  }}
+                  className={`w-full flex items-center justify-between text-xs px-2.5 py-2 rounded-xl border transition text-left cursor-pointer ${
+                    isSelected
+                      ? 'bg-slate-800 border-slate-700 text-white font-bold shadow-xs'
+                      : 'bg-slate-900/40 border-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {item.active ? (
+                      <div className={`w-2 h-2 rounded-full ${item.dot}`} />
+                    ) : (
+                      <Lock className="w-3 h-3 text-slate-600" />
+                    )}
+                    <span className={item.active ? (isSelected ? 'font-bold text-white' : 'text-slate-300') : 'text-slate-500'}>
+                      {item.lvl}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">{item.done}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
       </aside>
@@ -1916,668 +1966,45 @@ function FluentiaPathContent() {
       {/* ================= CONTENIDO CENTRAL ================= */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
 
-        {/* VISTA 1: CAMINO UNIVERSITARIO DE APRENDIZAJE (MISSION CARDS TIMELINE) */}
+        {/* VISTA 1: CAMINO UNIVERSITARIO DE APRENDIZAJE (MODULAR) */}
         {currentView === 'PATH' && (
-          <main className="flex-1 px-4 sm:px-8 py-8 md:py-10 pb-28 md:pb-12 max-w-4xl mx-auto w-full space-y-10">
-
-            {/* Hero Header Gamificado */}
-            <div className="text-center space-y-3 pt-2">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold shadow-md shadow-emerald-500/10">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span>ESTÁNDAR MCER A1 → C2 • INPUT COMPRENSIBLE i+1</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                Ruta Universitaria de Adquisición
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto leading-relaxed">
-                Supera cada misión comunicativa sin traducir mentalmente. Cada lección desbloquea la siguiente con inmersión sonora nativa y evaluación automática.
-              </p>
-            </div>
-
-            {/* Barra de Filtro por Nivel CEFR */}
-            <div className="flex items-center justify-center gap-1.5 flex-wrap p-1.5 bg-[#0b101b] rounded-2xl border border-slate-800/90 text-xs shadow-md">
-              {[
-                { id: 'ALL', label: 'Todos (24)', dot: 'bg-slate-400', tabActive: 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black shadow-md shadow-emerald-500/20 border-emerald-400', tabInactive: 'bg-[#0d131f] text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-[#12192b]' },
-                { id: 'A1', label: 'A1 Fundamentos', dot: 'bg-emerald-400', tabActive: LEVEL_THEMES.A1.tabActive, tabInactive: LEVEL_THEMES.A1.tabInactive },
-                { id: 'A2', label: 'A2 Comunicación', dot: 'bg-cyan-400', tabActive: LEVEL_THEMES.A2.tabActive, tabInactive: LEVEL_THEMES.A2.tabInactive },
-                { id: 'B1', label: 'B1 Independencia', dot: 'bg-blue-400', tabActive: LEVEL_THEMES.B1.tabActive, tabInactive: LEVEL_THEMES.B1.tabInactive },
-                { id: 'B2', label: 'B2 Académico', dot: 'bg-purple-400', tabActive: LEVEL_THEMES.B2.tabActive, tabInactive: LEVEL_THEMES.B2.tabInactive },
-                { id: 'C1', label: 'C1 Avanzado', dot: 'bg-rose-400', tabActive: LEVEL_THEMES.C1.tabActive, tabInactive: LEVEL_THEMES.C1.tabInactive },
-                { id: 'C2', label: 'C2 Maestría', dot: 'bg-amber-400', tabActive: LEVEL_THEMES.C2.tabActive, tabInactive: LEVEL_THEMES.C2.tabInactive },
-              ].map((tab) => {
-                const isSelected = routeLevelFilter === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setRouteLevelFilter(tab.id as any)}
-                    className={`px-3.5 py-1.5 rounded-xl font-bold transition text-xs flex items-center gap-2 border ${
-                      isSelected ? tab.tabActive : tab.tabInactive
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${tab.dot}`} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Camino de Aventura estilo Duolingo Pro con Nodos Circulares y Curvas Onduladas */}
-            <div className="relative pt-2 pb-12 w-full max-w-2xl mx-auto flex flex-col items-center">
-              {filteredLessons.map((lesson, index) => {
-                const status = getNodeStatus(lesson);
-                const isCompleted = status === 'COMPLETED';
-                const isActive = status === 'ACTIVE';
-                const isLocked = status === 'LOCKED';
-                const shouldShowBanner = index === 0 || filteredLessons[index - 1].unit !== lesson.unit;
-                const theme = LEVEL_THEMES[lesson.level] || LEVEL_THEMES.A1;
-
-                // Verificación de bloqueo por sub-nodos pendientes del nodo anterior
-                const prereqLesson = lesson.prerequisiteId ? filteredLessons.find(l => l.id === lesson.prerequisiteId) : null;
-                const prereqSubNodesStatus = prereqLesson ? getSubNodesCompletionStatus(prereqLesson.id) : null;
-                const isLockedBySubNodes = isLocked && prereqLesson && completedNodeIds.includes(prereqLesson.id) && !prereqSubNodesStatus?.allDone;
-
-                // Sub-Nodos de inmersión para esta lección madre
-                const subNodes = getSubNodesForLesson(lesson.id, languageId);
-                const subNodesStatus = getSubNodesCompletionStatus(lesson.id);
-                const areSubNodesUnlocked = isCompleted;
-
-                // Desplazamiento serpenteante: 0 -> Centro, 1 -> Derecha, 2 -> Izquierda
-                const cycle = index % 3;
-                const serpentineClass = cycle === 0 
-                  ? 'translate-x-0' 
-                  : cycle === 1 
-                    ? 'translate-x-20 sm:translate-x-28' 
-                    : '-translate-x-20 sm:-translate-x-28';
-
-                // Popover abierto si hovered o clickeado
-                const isPopoverOpen = hoveredLessonId === lesson.id || activePopoverLessonId === lesson.id;
-
-                return (
-                  <div key={lesson.id} className="w-full flex flex-col items-center">
-
-                    {/* Banner de Unidad con Proyecto Universitario Oficial */}
-                    {shouldShowBanner && (
-                      <div className={`w-full max-w-xl my-8 p-6 rounded-3xl bg-gradient-to-br ${theme.bannerBg} border border-slate-800/90 shadow-xl space-y-4`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3.5">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black font-mono text-base shadow-lg bg-gradient-to-br ${theme.btnGradient} ${theme.btnText}`}>
-                              U{lesson.unit}
-                            </div>
-                            <div>
-                              <span className={`text-[10px] font-mono uppercase tracking-wider font-bold block ${theme.accentText}`}>
-                                Módulo Curricular • Nivel {lesson.level} ({theme.name})
-                              </span>
-                              <h2 className="text-base sm:text-lg font-black text-white">{lesson.unitTitle}</h2>
-                            </div>
-                          </div>
-
-                          {isLocked ? (
-                            <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-xl border border-slate-800 font-medium shadow-sm">
-                              <Lock className="w-3.5 h-3.5" />
-                              <span>Siguiente</span>
-                            </div>
-                          ) : (
-                            <span className={`text-xs font-bold px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-sm border ${theme.badgeBg}`}>
-                              <span className={`w-2 h-2 rounded-full ${theme.dotColor} animate-pulse`} />
-                              En Progreso
-                            </span>
-                          )}
-                        </div>
-
-                        {lesson.academicProject && (
-                          <div className="flex items-start gap-2.5 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
-                            <GraduationCap className={`w-4 h-4 shrink-0 mt-0.5 ${theme.accentText}`} />
-                            <span className="leading-relaxed">
-                              <strong className="text-white">Proyecto Universitario:</strong> {lesson.academicProject}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* =========================================================================
-                        NODO MADRE (Círculo 80x80px Aislado y Centrado con Popover Flotante)
-                    ========================================================================= */}
-                    <div className={`relative flex flex-col items-center my-3 transition-transform ${serpentineClass}`}>
-
-                      {/* Píldora de XP flotando sobre el nodo si está activo */}
-                      {isActive && (
-                        <div className="absolute -top-7 text-[10px] font-mono font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-md animate-bounce z-10 pointer-events-none">
-                          +{lesson.xpReward} XP
-                        </div>
-                      )}
-
-                      {/* Círculo Grande del Nodo Madre (aprox 80x80px) con botón táctil 3D */}
-                      <button
-                        onMouseEnter={() => setHoveredLessonId(lesson.id)}
-                        onMouseLeave={() => setHoveredLessonId(null)}
-                        onClick={() => {
-                          setActivePopoverLessonId(activePopoverLessonId === lesson.id ? null : lesson.id);
-                          soundManager.playClick();
-                        }}
-                        title={isCompleted ? `Ver misión: ${lesson.title}` : isActive ? `Comenzar: ${lesson.title}` : `Bloqueado: ${lesson.title}`}
-                        className={`w-20 h-20 sm:w-22 sm:h-22 rounded-full flex items-center justify-center transition-all select-none relative group ${
-                          isCompleted
-                            ? 'bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-700 text-white border-4 border-emerald-300 shadow-[0_8px_0_#065f46] shadow-emerald-500/30 hover:scale-105 active:translate-y-1 active:shadow-[0_2px_0_#065f46] cursor-pointer'
-                            : isActive
-                              ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white border-4 border-emerald-300 shadow-[0_8px_0_#065f46] ring-4 ring-emerald-400/40 animate-pulse hover:scale-105 active:translate-y-1 active:shadow-[0_2px_0_#065f46] cursor-pointer'
-                              : 'bg-[#0d131f] border-4 border-slate-800 text-slate-600 shadow-[0_8px_0_#080c14] hover:border-slate-700 cursor-not-allowed'
-                        }`}
-                      >
-                        {isCompleted ? (
-                          (() => {
-                            const Icon = lesson.code === '1.1' ? Briefcase : lesson.code === '1.2' ? Compass : lesson.code === '1.3' ? Coffee : lesson.code === '1.4' ? FileText : Compass;
-                            return <Icon className="w-9 h-9 stroke-[2.2] text-white drop-shadow-md group-hover:scale-110 transition-transform" />;
-                          })()
-                        ) : isActive ? (
-                          (() => {
-                            const Icon = lesson.code === '1.1' ? Briefcase : lesson.code === '1.2' ? Compass : lesson.code === '1.3' ? Coffee : lesson.code === '1.4' ? FileText : Compass;
-                            return <Icon className="w-9 h-9 stroke-[2.2] text-white drop-shadow-md group-hover:scale-110 transition-transform" />;
-                          })()
-                        ) : (
-                          <Lock className="w-8 h-8 stroke-[2] text-slate-600" />
-                        )}
-
-                        {/* Check verde brillante si el Nodo Madre está completado */}
-                        {isCompleted && (
-                          <div className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-emerald-500 text-slate-950 border-2 border-[#07090e] flex items-center justify-center font-black shadow-lg">
-                            <Check className="w-4 h-4 stroke-[3.5] text-slate-950" />
-                          </div>
-                        )}
-                      </button>
-
-                      {/* Popover / Tooltip Flotante (Aparece al hacer Clic o pasar el Ratón) */}
-                      <AnimatePresence>
-                        {isPopoverOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.94 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 8, scale: 0.94 }}
-                            transition={{ duration: 0.16, ease: 'easeOut' }}
-                            className="absolute bottom-full mb-3.5 z-40 w-72 sm:w-80 p-4 rounded-2xl bg-[#0c1322]/95 backdrop-blur-xl border border-slate-700/90 shadow-2xl shadow-black/90 flex flex-col gap-2 text-left pointer-events-auto select-none"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {/* Header del Popover */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-full border ${theme.badgeBg}`}>
-                                  Lección {lesson.code}
-                                </span>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-slate-800 bg-slate-900 text-slate-400 font-bold">
-                                  {lesson.level}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                                <Zap className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                <span>+{lesson.xpReward} XP</span>
-                              </div>
-                            </div>
-
-                            {/* Título y Subtítulo */}
-                            <div className="space-y-1">
-                              <h4 className="text-sm sm:text-base font-black text-white leading-snug">
-                                {lesson.title}
-                              </h4>
-                              <p className="text-xs text-slate-400 leading-relaxed font-normal">
-                                {lesson.subtitle}
-                              </p>
-                            </div>
-
-                            {/* Botón de Acción Principal */}
-                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                              {isCompleted ? (
-                                <button
-                                  onClick={() => {
-                                    setActivePopoverLessonId(null);
-                                    startLesson(lesson);
-                                  }}
-                                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
-                                >
-                                  <RotateCcw className="w-3.5 h-3.5" />
-                                  <span>Repasar Lección (+{lesson.xpReward} XP)</span>
-                                </button>
-                              ) : isActive ? (
-                                <button
-                                  onClick={() => {
-                                    setActivePopoverLessonId(null);
-                                    startLesson(lesson);
-                                  }}
-                                  className={`w-full py-2 px-3 rounded-xl bg-gradient-to-r ${theme.btnGradient} hover:opacity-95 ${theme.btnText} font-black text-xs transition shadow-md shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer`}
-                                >
-                                  <span>Comenzar Lección (6 Etapas)</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              ) : isLockedBySubNodes ? (
-                                <div className="w-full text-[11px] text-amber-300 bg-amber-500/15 border border-amber-500/30 p-2 rounded-xl flex items-center gap-1.5 font-medium leading-tight">
-                                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                                  <span>Completa los 3 sub-nodos de la Lección {prereqLesson?.code} ({prereqSubNodesStatus?.completedCount}/3)</span>
-                                </div>
-                              ) : (
-                                <div className="w-full text-center text-xs text-slate-500 font-mono py-1 flex items-center justify-center gap-1.5">
-                                  <Lock className="w-3.5 h-3.5" />
-                                  <span>Lección Bloqueada</span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Botón Acceso a la Biblioteca de Inmersión del Tema */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActivePopoverLessonId(null);
-                                setSelectedLibraryLesson({ id: lesson.id, code: lesson.code, title: lesson.title, level: lesson.level });
-                                setIsLibraryOpen(true);
-                                soundManager.playClick();
-                              }}
-                              className="w-full mt-2 py-2 px-3 rounded-xl bg-[#080d16] hover:bg-[#0f1728] border border-slate-700/80 hover:border-emerald-500/50 text-emerald-300 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm group"
-                              title="Ver textos, audios y casos adicionales de este tema"
-                            >
-                              <BookOpen className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
-                              <span>Ir a la Biblioteca de este Tema</span>
-                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-1.5 py-0.2 rounded-full ml-1">
-                                +Input
-                              </span>
-                            </button>
-
-                            {/* Flecha indicadora apuntando al círculo */}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-[#0c1322]" />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                    </div>
-
-                    {/* =========================================================================
-                        SUB-NODOS (40x40px) CONECTADOS AL NODO 1.1 (Reading, Listening, SRS)
-                    ========================================================================= */}
-                    {areSubNodesUnlocked && (
-                      <div className={`flex flex-col items-center my-1 transition-transform ${serpentineClass}`}>
-                        {/* Línea vertical conectora desde el nodo madre */}
-                        <div className="flex justify-center my-1 select-none pointer-events-none">
-                          <svg width="24" height="20" viewBox="0 0 24 20" fill="none">
-                            <line
-                              x1="12"
-                              y1="0"
-                              x2="12"
-                              y2="20"
-                              stroke="#10b981"
-                              strokeWidth="2.5"
-                              strokeDasharray="4 4"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </div>
-
-                        {/* Los 3 Círculos de 40x40px de Inmersión */}
-                        <div className="flex items-center justify-center gap-4 sm:gap-5 my-1">
-                          {subNodes.map((sub) => {
-                            const isSubDone = completedSubNodeIds.includes(sub.id);
-                            const SubIcon = sub.type === 'reading' ? BookOpen : sub.type === 'listening' ? Headphones : RotateCw;
-                            const subTitle = sub.type === 'reading' ? 'Lectura Inmersiva' : sub.type === 'listening' ? 'Escucha Receptiva' : 'Repaso SRS';
-
-                            return (
-                              <div key={sub.id} className="relative flex flex-col items-center group">
-                                <button
-                                  onClick={() => {
-                                    const isPaywallOn = AppStorage.getPaywallEnabled();
-                                    const isPremium = AppStorage.isUserPremium();
-                                    const isRestrictedLevel = ['B1', 'B2', 'C1', 'C2'].includes(lesson.level.toUpperCase());
-                                    const isCallCenterTrack = languageId === 'call-center' || languageId.includes('call-center');
-
-                                    if (isPaywallOn && !isPremium && (isRestrictedLevel || isCallCenterTrack)) {
-                                      setPaywallReason(
-                                        isCallCenterTrack 
-                                          ? 'El Track de Call Center BPO requiere una suscripción Nativa Premium activa.'
-                                          : `Los sub-nodos del nivel ${lesson.level} requieren Nativa Premium.`
-                                      );
-                                      setIsPaywallModalOpen(true);
-                                      soundManager.playWrong();
-                                      return;
-                                    }
-
-                                    // Alerta de Contenido B2-C2 en Curaduría (Tarea 4)
-                                    const isB2C2 = ['B2', 'C1', 'C2'].includes(lesson.level.toUpperCase());
-                                    if (isB2C2 && sub.type === 'reading') {
-                                      setB2c2AlertLevel(lesson.level);
-                                      setB2c2AlertModalOpen(true);
-                                      soundManager.playClick();
-                                      return;
-                                    }
-
-                                    setActiveSubNode(sub);
-                                    soundManager.playClick();
-                                  }}
-                                  title={`${subTitle} (+${sub.xpReward} XP)`}
-                                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all select-none relative shadow-md active:translate-y-0.5 cursor-pointer ${
-                                    isSubDone
-                                      ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white border-2 border-emerald-300 shadow-[0_3px_0_#065f46] shadow-emerald-500/25 hover:scale-115'
-                                      : 'bg-[#0c1a2e] border-2 border-cyan-400 text-cyan-300 shadow-[0_0_16px_rgba(6,182,212,0.45)] ring-4 ring-cyan-500/25 hover:scale-115 animate-pulse'
-                                  }`}
-                                >
-                                  <SubIcon className="w-4 h-4 stroke-[2.2]" />
-
-                                  {/* Badge: Check verde o chispa activa */}
-                                  {isSubDone ? (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-slate-950 border border-[#07090e] flex items-center justify-center font-bold shadow-xs">
-                                      <Check className="w-2.5 h-2.5 stroke-[3.5] text-slate-950" />
-                                    </div>
-                                  ) : (
-                                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-cyan-400 border border-[#07090e] flex items-center justify-center shadow-xs">
-                                      <Sparkles className="w-2 h-2 text-slate-950" />
-                                    </div>
-                                  )}
-                                </button>
-
-                                {/* Micro-label flotante al pasar el ratón */}
-                                <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 text-[9px] font-mono font-bold whitespace-nowrap px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200 pointer-events-none z-20 shadow-sm">
-                                  {sub.type === 'reading' ? 'Reading' : sub.type === 'listening' ? 'Listening' : 'SRS'} (+{sub.xpReward} XP)
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* =========================================================================
-                        TRAZO SVG SERPENTEANTE QUE CONECTA ESTE NODO CON EL SIGUIENTE
-                    ========================================================================= */}
-                    {index < filteredLessons.length - 1 && (
-                      <div className="flex justify-center select-none pointer-events-none my-2">
-                        {cycle === 0 ? (
-                          // De Centro (1.1) hacia la Derecha (1.2)
-                          <svg width="150" height="75" viewBox="0 0 150 75" fill="none">
-                            <path
-                              d="M 25 0 C 25 40, 125 35, 125 75"
-                              stroke={subNodesStatus.allDone ? '#10b981' : '#334155'}
-                              strokeWidth="3"
-                              strokeDasharray="6 6"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        ) : cycle === 1 ? (
-                          // De la Derecha (1.2) hacia la Izquierda (1.3)
-                          <svg width="220" height="85" viewBox="0 0 220 85" fill="none">
-                            <path
-                              d="M 175 0 C 175 50, 45 35, 45 85"
-                              stroke="#334155"
-                              strokeWidth="3"
-                              strokeDasharray="6 6"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        ) : (
-                          // De la Izquierda (1.3) de vuelta hacia el Centro (1.4)
-                          <svg width="150" height="75" viewBox="0 0 150 75" fill="none">
-                            <path
-                              d="M 35 0 C 35 40, 115 35, 115 75"
-                              stroke="#334155"
-                              strokeWidth="3"
-                              strokeDasharray="6 6"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    )}
-
-                  </div>
-                );
-              })}
-            </div>
-
-          </main>
+          <LearningMap
+            lessons={COMPREHENSIVE_CURRICULUM}
+            completedNodeIds={completedNodeIds}
+            completedSubNodeIds={completedSubNodeIds}
+            languageId={languageId}
+            routeLevelFilter={routeLevelFilter}
+            onFilterChange={setRouteLevelFilter}
+            activePopoverLessonId={activePopoverLessonId}
+            hoveredLessonId={hoveredLessonId}
+            onHoverLesson={setHoveredLessonId}
+            onSelectLesson={setActivePopoverLessonId}
+            onStartLesson={(lesson) => {
+              startLesson(lesson);
+            }}
+            onSubNodeClick={(subNode) => {
+              setActiveSubNode(subNode);
+            }}
+            onOpenTopicLibrary={(lesson) => {
+              setSelectedLibraryLesson(lesson);
+              setIsLibraryOpen(true);
+            }}
+          />
         )}
 
-        {/* VISTA: BIBLIOTECA DE INMERSIÓN MASIVA (NARROW READING KRASHENIANO) */}
+        {/* VISTA 2: BIBLIOTECA DE INMERSIÓN MASIVA (MODULAR) */}
         {currentView === 'IMMERSION' && (
-          <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full space-y-8 pb-28 md:pb-8">
-
-            {/* Header de la Sección de Inmersión */}
-            <div className="space-y-4 border-b border-slate-800 pb-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono px-2.5 py-1 rounded-md bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 font-bold uppercase">
-                    Input Masivo i+1 • Narrow Reading
-                  </span>
-                  <span className="text-xs text-slate-400 hidden sm:inline">Adquisición Natural por Exposición Graduada</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs font-mono text-teal-300 bg-[#0b101b] border border-slate-800 px-3 py-1 rounded-xl shadow-xs">
-                  <Clock className="w-4 h-4 text-emerald-400" />
-                  <span className="font-bold">{immersionMinutes} Minutos de Inmersión Registrados</span>
-                </div>
-              </div>
-
-              <div>
-                <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-                  Biblioteca de Inmersión y Lectura Graduada
-                </h1>
-                <p className="text-xs text-slate-400 max-w-3xl leading-relaxed mt-1">
-                  Textos narrativos ricos en contexto (200 a 450 palabras) diseñados bajo la hipótesis del <strong className="text-slate-200">Input Comprensible de Krashen</strong>. Sin exámenes punitivos: lee a tu ritmo, activa el audio nativo y consolida tu adquisición mediante <em className="text-emerald-300">narrow reading</em> (series que reciclan vocabulario común).
-                </p>
-              </div>
-
-              {/* Filtro por Nivel CEFR */}
-              {!selectedImmersionStory && (
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {['ALL', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((lvl) => {
-                    const isSelected = immersionLevelFilter === lvl;
-                    return (
-                      <button
-                        key={lvl}
-                        onClick={() => {
-                          setImmersionLevelFilter(lvl);
-                          soundManager.playClick();
-                        }}
-                        className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition border ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 border-transparent shadow-md shadow-emerald-500/20 font-black'
-                            : 'bg-[#0c111c] text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
-                        }`}
-                      >
-                        {lvl === 'ALL' ? 'Todas las Historias (6 Niveles)' : `Nivel ${lvl}`}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* LECTOR ENFOCADO DE HISTORIA DE INMERSIÓN */}
-            {selectedImmersionStory ? (
-              <div className="space-y-6">
-                <button
-                  onClick={() => {
-                    if (isPlayingAudio) window.speechSynthesis.cancel();
-                    setSelectedImmersionStory(null);
-                    soundManager.playClick();
-                  }}
-                  className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white px-3 py-1.5 rounded-xl bg-[#0c111c] hover:bg-[#111928] border border-slate-800 hover:border-slate-700 transition"
-                >
-                  <ArrowRight className="w-4 h-4 rotate-180" />
-                  <span>Volver a la Biblioteca de Inmersión</span>
-                </button>
-
-                <div className="p-6 md:p-8 rounded-3xl bg-[#0c111c]/95 border border-slate-800/80 shadow-2xl space-y-6 backdrop-blur-xl">
-                  {/* Encabezado del Texto */}
-                  <div className="space-y-2 border-b border-slate-800/80 pb-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-500/30">
-                          Nivel {selectedImmersionStory.level}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md">
-                          {selectedImmersionStory.themeSeries}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
-                        <span>{selectedImmersionStory.wordCount} palabras</span>
-                        <span>•</span>
-                        <span>⏱️ ~{selectedImmersionStory.readingMinutes} min de lectura</span>
-                      </div>
-                    </div>
-
-                    <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-                      {selectedImmersionStory.title}
-                    </h2>
-                    <p className="text-sm text-slate-400 italic">
-                      {selectedImmersionStory.subtitle}
-                    </p>
-
-                    {/* Botón de Audio Narrativo */}
-                    <div className="pt-3 flex items-center gap-3">
-                      <button
-                        onClick={() => {
-                          const fullText = selectedImmersionStory.paragraphs.join(' ');
-                          speakText(fullText);
-                        }}
-                        className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white transition shadow-md shadow-emerald-500/20"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                        <span>Escuchar Narración Completa en Audio Nativo</span>
-                      </button>
-                      {isPlayingAudio && (
-                        <button
-                          onClick={() => {
-                            if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                              window.speechSynthesis.cancel();
-                            }
-                            setIsPlayingAudio(false);
-                          }}
-                          className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl bg-[#0e1626] hover:bg-[#152033] text-slate-300 border border-slate-700 transition"
-                        >
-                          <VolumeX className="w-4 h-4" />
-                          <span>Pausar</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Párrafos del Texto Comprensible */}
-                  <div className="space-y-4 text-slate-200 leading-relaxed text-base font-normal">
-                    {selectedImmersionStory.paragraphs.map((p, idx) => (
-                      <p key={idx} className="p-3 rounded-2xl hover:bg-slate-900/40 transition duration-150 border border-transparent hover:border-slate-800">
-                        {p}
-                      </p>
-                    ))}
-                  </div>
-
-                  {/* Spotlight de Vocabulario en Contexto */}
-                  <div className="p-5 rounded-2xl bg-[#080c14] border border-slate-800/80 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
-                        Vocabulario Clave Reciclado en Contexto
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {selectedImmersionStory.vocabularySpotlight.map((v, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-[#0e1626] border border-slate-800 shadow-xs">
-                          <div className="flex items-center justify-between gap-2">
-                            <strong className="text-white text-xs">{v.word}</strong>
-                            <span className="text-[10px] font-mono text-slate-400">{v.phonetic}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-snug">{v.meaning}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Chequeo Voluntario de Sentido */}
-                  {selectedImmersionStory.voluntaryCheck && (
-                    <div className="p-5 rounded-2xl bg-blue-950/25 border border-blue-500/30 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-blue-400" />
-                        <span className="text-xs font-bold text-blue-300 uppercase tracking-wider font-mono">
-                          Comprobación Voluntaria de Sentido (Sin Nota ni Penalización)
-                        </span>
-                      </div>
-                      <p className="text-xs text-blue-100 font-semibold">
-                        {selectedImmersionStory.voluntaryCheck.question}
-                      </p>
-                      <div className="space-y-2">
-                        {selectedImmersionStory.voluntaryCheck.options.map((opt, i) => (
-                          <div key={i} className="p-3 rounded-xl bg-[#0b1325] border border-blue-900/40 text-xs text-blue-100">
-                            {opt}
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-blue-300 italic pt-1">
-                        💡 {selectedImmersionStory.voluntaryCheck.insight}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Botón de Finalización de Inmersión */}
-                  <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-                    <span className="text-xs text-slate-400">
-                      Al terminar, registrarás {selectedImmersionStory.readingMinutes} minutos de exposición comprensible.
-                    </span>
-                    <button
-                      onClick={() => handleFinishImmersionStory(selectedImmersionStory)}
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white font-bold text-xs transition shadow-md shadow-emerald-600/30 flex items-center gap-2"
-                    >
-                      <Check className="w-4 h-4 stroke-[3]" />
-                      <span>Completar Lectura (+{selectedImmersionStory.readingMinutes}m Inmersión / +30 XP)</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* GRID DE HISTORIAS DE INMERSIÓN */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {IMMERSION_STORIES.filter(
-                  (s) => immersionLevelFilter === 'ALL' || s.level === immersionLevelFilter
-                ).map((story) => (
-                  <div
-                    key={story.id}
-                    className="p-6 rounded-3xl bg-[#0c111c]/90 border border-slate-800/80 shadow-sm hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-500/5 transition flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-500/30">
-                          Nivel {story.level}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md">
-                          ⏱️ {story.readingMinutes} min lectura
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-bold">
-                          {story.themeSeries}
-                        </span>
-                        <h3 className="text-base font-black text-white mt-0.5">
-                          {story.title}
-                        </h3>
-                        <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
-                          {story.summary}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-[11px] font-mono text-slate-500 pt-1">
-                        <span>{story.wordCount} palabras</span>
-                        <span>•</span>
-                        <span>Audio: {story.audioDurationText}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setSelectedImmersionStory(story);
-                        soundManager.playClick();
-                      }}
-                      className="w-full py-2.5 rounded-xl bg-[#0e1626] hover:bg-emerald-500 hover:text-slate-950 text-slate-200 font-bold text-xs transition border border-slate-700/80 flex items-center justify-center gap-2"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      <span>Leer en Inmersión Activa</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-          </main>
+          <ImmersionViewer
+            immersionMinutes={immersionMinutes}
+            selectedStory={selectedImmersionStory}
+            immersionLevelFilter={immersionLevelFilter}
+            isPlayingAudio={activeAudioIndex !== null}
+            onSelectStory={setSelectedImmersionStory}
+            onFilterChange={setImmersionLevelFilter}
+            onSpeakText={(text) => speakText(text)}
+            onStopAudio={() => stopContinuousDialogue()}
+            onFinishStory={(story) => handleFinishImmersionStory(story)}
+          />
         )}
 
         {/* VISTA 2: TEMARIO Y NIVELES DETALLADOS (SYLLABUS & LEVELS EXPLORER) */}
@@ -2876,7 +2303,7 @@ function FluentiaPathContent() {
         ========================================================================= */}
         {currentView === 'PROJECTS' && (
           <main className="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full space-y-8 pb-28 md:pb-8">
-            
+
             {/* Header del Taller de Proyectos */}
             <div className="space-y-4 border-b border-slate-800 pb-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2917,15 +2344,13 @@ function FluentiaPathContent() {
                         setProjectTextDraft(projectSubmissions[proj.unit]?.content || '');
                         soundManager.playClick();
                       }}
-                      className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-2 shrink-0 ${
-                        isSelected 
-                          ? 'bg-purple-950/60 text-purple-200 border-2 border-purple-500 shadow-sm ring-1 ring-purple-500/20' 
-                          : 'bg-[#0c111c] text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-[#111928]'
-                      }`}
+                      className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-2 shrink-0 ${isSelected
+                        ? 'bg-purple-950/60 text-purple-200 border-2 border-purple-500 shadow-sm ring-1 ring-purple-500/20'
+                        : 'bg-[#0c111c] text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-[#111928]'
+                        }`}
                     >
-                      <span className={`w-5 h-5 rounded-md flex items-center justify-center font-mono text-[10px] ${
-                        isSubmitted ? 'bg-emerald-500 text-slate-950 font-black' : isSelected ? 'bg-purple-500 text-white font-bold' : 'bg-slate-800 text-slate-400'
-                      }`}>
+                      <span className={`w-5 h-5 rounded-md flex items-center justify-center font-mono text-[10px] ${isSubmitted ? 'bg-emerald-500 text-slate-950 font-black' : isSelected ? 'bg-purple-500 text-white font-bold' : 'bg-slate-800 text-slate-400'
+                        }`}>
                         U{proj.unit}
                       </span>
                       <span>{proj.level} • {proj.badge}</span>
@@ -2946,10 +2371,10 @@ function FluentiaPathContent() {
 
               return (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
+
                   {/* Columna Izquierda: Editor y Pautas */}
                   <div className="lg:col-span-7 space-y-6">
-                    
+
                     {/* Tarjeta de Instrucciones del Proyecto */}
                     <div className="p-5 rounded-2xl bg-[#0c111c]/90 border border-slate-800 space-y-3 shadow-sm">
                       <div className="flex items-center justify-between">
@@ -2960,10 +2385,10 @@ function FluentiaPathContent() {
                           Meta: {currentProj.minWords} – {currentProj.maxWords} palabras
                         </span>
                       </div>
-                      
+
                       <h2 className="text-lg font-bold text-white">{currentProj.title}</h2>
                       <p className="text-xs text-slate-400 leading-relaxed">{currentProj.context}</p>
-                      
+
                       <div className="p-3 rounded-xl bg-[#080c14] border border-slate-800 text-xs text-slate-300 space-y-1">
                         <span className="font-bold text-[10px] uppercase font-mono tracking-wider block text-emerald-400">
                           📋 Instrucción de la Tarea:
@@ -2981,13 +2406,12 @@ function FluentiaPathContent() {
                         {currentProj.requiredKeywords.map((kw, kwIdx) => {
                           const isMatched = draftText.toLowerCase().includes(kw.toLowerCase());
                           return (
-                            <span 
+                            <span
                               key={kwIdx}
-                              className={`text-xs px-2.5 py-1 rounded-lg border font-mono transition flex items-center gap-1.5 ${
-                                isMatched 
-                                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 font-bold shadow-xs' 
-                                  : 'bg-[#080c14] border-slate-800 text-slate-500'
-                              }`}
+                              className={`text-xs px-2.5 py-1 rounded-lg border font-mono transition flex items-center gap-1.5 ${isMatched
+                                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 font-bold shadow-xs'
+                                : 'bg-[#080c14] border-slate-800 text-slate-500'
+                                }`}
                             >
                               {isMatched ? <Check className="w-3 h-3 text-emerald-400" /> : <Sparkles className="w-3 h-3 text-slate-500" />}
                               <span>{kw}</span>
@@ -3135,9 +2559,9 @@ function FluentiaPathContent() {
 
                   {/* Columna Derecha: Rúbricas Oficiales y Evaluación */}
                   <div className="lg:col-span-5 space-y-5">
-                    
+
                     {submission ? (
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="p-6 rounded-3xl bg-[#0c111c]/95 border-2 border-purple-500/40 shadow-xl space-y-5"
@@ -3276,249 +2700,31 @@ function FluentiaPathContent() {
           </main>
         )}
 
-        {/* =========================================================================
-            VISTA 4: REPASO ESPACIADO INTELIGENTE (SRS FLASHCARDS & MONITOR SLA)
-        ========================================================================= */}
+        {/* VISTA 4: REPASO ESPACIADO INTELIGENTE (MODULAR) */}
         {currentView === 'REVIEW' && (
-          <main className="flex-1 p-4 md:p-8 max-w-4xl mx-auto w-full space-y-6 pb-28 md:pb-12">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 rounded-3xl bg-[#0c111c]/90 border border-slate-800 shadow-sm">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-blue-950/60 text-blue-300 border border-blue-500/30">
-                    SRS & Spaced Retrieval
-                  </span>
-                  <span className="text-xs text-slate-400">
-                    {srsDeck.length} tarjetas generadas
-                  </span>
-                </div>
-                <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
-                  <Brain className="w-7 h-7 text-blue-400" />
-                  Repaso Inteligente Espaciado
-                </h1>
-                <p className="text-xs md:text-sm text-slate-400 max-w-2xl leading-relaxed">
-                  Refuerza el léxico de situaciones reales, expresiones idiomáticas y tus frases estrella (⭐). Voltea la tarjeta, escucha la pronunciación nativa con transcripción IPA y evalúa tu retención sin castigo.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 self-end md:self-auto">
-                <div className="p-3 rounded-2xl bg-[#080c14] border border-slate-800 text-center">
-                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Repasadas Hoy</span>
-                  <span className="text-lg font-black text-blue-400 font-mono">+{srsCardsReviewedCount}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Filtro por Nivel */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-              {['ALL', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((lvl) => (
-                <button
-                  key={lvl}
-                  onClick={() => {
-                    setSrsLevelFilter(lvl);
-                    soundManager.playClick();
-                  }}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 ${
-                    srsLevelFilter === lvl
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-[#0c111c] text-slate-300 hover:text-white border border-slate-800 hover:bg-[#111928]'
-                  }`}
-                >
-                  {lvl === 'ALL' ? 'Todos los Niveles' : `Nivel ${lvl}`}
-                </button>
-              ))}
-            </div>
-
-            {/* Tarjeta Flashcard Interactiva */}
-            {srsDeck.length === 0 ? (
-              <div className="p-12 text-center rounded-3xl bg-[#0c111c]/90 border border-slate-800 space-y-3 shadow-sm">
-                <AlertCircle className="w-8 h-8 text-slate-500 mx-auto" />
-                <h3 className="text-base font-bold text-white">No hay tarjetas disponibles para este filtro</h3>
-                <p className="text-xs text-slate-400">Completa lecciones en tu Ruta de Adquisición o marca frases con estrella (⭐) para repasar.</p>
-              </div>
-            ) : (
-              (() => {
-                const card = srsDeck[currentCardIndex % srsDeck.length];
-                return (
-                  <div className="space-y-6">
-                    {/* Barra de progreso de la baraja */}
-                    <div className="flex items-center justify-between text-xs text-slate-400 px-1 font-mono">
-                      <span>Tarjeta {(currentCardIndex % srsDeck.length) + 1} de {srsDeck.length}</span>
-                      <span>Nivel {card.level} • Unidad {card.unit}</span>
-                    </div>
-
-                    {/* Tarjeta con Efecto Flip / Toca para Revelar */}
-                    <div
-                      onClick={() => setIsCardFlipped(!isCardFlipped)}
-                      className="cursor-pointer min-h-[300px] md:min-h-[340px] rounded-3xl p-6 md:p-10 border transition-all duration-300 flex flex-col justify-between shadow-2xl relative overflow-hidden bg-gradient-to-br from-[#0e1626] to-[#0c111c] border-2 border-slate-700/80 hover:border-cyan-500/50"
-                    >
-                      {/* Top Tag & Audio */}
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider bg-blue-950/60 text-blue-300 border border-blue-500/30">
-                          {card.categoryLabel}
-                        </span>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            speakText(card.audioText);
-                          }}
-                          className="p-2.5 rounded-xl bg-blue-950/60 hover:bg-blue-900/60 text-blue-400 border border-blue-500/30 transition shadow-xs"
-                          title="Escuchar pronunciación nativa"
-                        >
-                          <Volume2 className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      {/* Contenido Central */}
-                      <div className="my-auto py-6 text-center space-y-4">
-                        {!isCardFlipped ? (
-                          <div className="space-y-3">
-                            <h2 className="text-xl md:text-3xl font-extrabold text-white tracking-tight leading-snug whitespace-pre-line">
-                              {card.front}
-                            </h2>
-                            {card.audioText && (
-                              <div className="pt-2 flex flex-col items-center gap-2">
-                                <span className="inline-flex items-center gap-2 font-mono text-xs sm:text-sm text-cyan-300 bg-cyan-950/60 px-3.5 py-1.5 rounded-xl border border-cyan-500/40 shadow-xs">
-                                  <span className="text-[10px] uppercase font-black tracking-wider text-cyan-400 bg-cyan-900/40 px-1.5 py-0.5 rounded border border-cyan-500/30">
-                                    IPA
-                                  </span>
-                                  <span>{card.phonetic || '/.../'}</span>
-                                </span>
-
-                                {/* Tarjeta opcional de aproximación fonética */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowFigurativeHelper(!showFigurativeHelper);
-                                  }}
-                                  className="text-[11px] text-slate-400 hover:text-amber-300 transition underline underline-offset-4 flex items-center gap-1"
-                                >
-                                  <span>{showFigurativeHelper ? 'Ocultar ayuda fonética en español' : '¿Te cuesta? Ver aproximación opcional'}</span>
-                                </button>
-
-                                {showFigurativeHelper && (
-                                  <span className="text-[11px] italic text-amber-300 bg-amber-950/40 border border-amber-500/30 px-3 py-1 rounded-lg">
-                                    Suena parecido a: &ldquo;{getFigurativePronunciation(card.audioText, card.phonetic)}&rdquo;
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            <p className="text-xs text-slate-400 pt-3 flex items-center justify-center gap-1.5">
-                              <RotateCw className="w-3.5 h-3.5 text-blue-400" />
-                              <span>Haz clic o toca para ver el significado y contexto</span>
-                            </p>
-                          </div>
-                        ) : (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="space-y-4"
-                          >
-                            <div className="p-4 rounded-2xl bg-blue-950/40 border border-blue-500/40 text-blue-100 font-bold text-xl md:text-2xl whitespace-pre-line">
-                              {card.back}
-                            </div>
-
-                            {card.explanation && (
-                              <p className="text-xs md:text-sm text-slate-300 leading-relaxed max-w-xl mx-auto">
-                                {card.explanation}
-                              </p>
-                            )}
-
-                            {card.exampleSentence && (
-                              <div className="p-3 rounded-xl bg-[#080c14] border border-slate-800 text-left max-w-xl mx-auto">
-                                <span className="text-[10px] uppercase font-mono text-slate-400 block">Ejemplo en Contexto:</span>
-                                <p className="text-xs text-white font-medium italic">&ldquo;{card.exampleSentence}&rdquo;</p>
-                                {card.exampleTranslation && (
-                                  <p className="text-[11px] text-slate-400 pt-0.5">{card.exampleTranslation}</p>
-                                )}
-                              </div>
-                            )}
-                          </motion.div>
-                        )}
-                      </div>
-
-                      {/* Footer de Tarjeta */}
-                      <div className="text-center pt-2 border-t border-slate-800">
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {isCardFlipped ? '¿Qué tan bien lo recordabas?' : 'Intenta recordarlo antes de voltear'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Botones de Autoevaluación SRS */}
-                    {isCardFlipped ? (
-                      <div className="grid grid-cols-3 gap-3">
-                        <button
-                          onClick={() => {
-                            soundManager.playGentleError();
-                            setIsCardFlipped(false);
-                            setCurrentCardIndex((prev) => (prev + 1) % srsDeck.length);
-                            setSrsCardsReviewedCount((c) => c + 1);
-                          }}
-                          className="p-3.5 rounded-2xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-rose-200 transition font-bold text-xs flex flex-col items-center gap-1 shadow-xs"
-                        >
-                          <span className="text-sm">⚠️ Difícil</span>
-                          <span className="text-[10px] text-rose-400 font-normal">Repetir pronto</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            soundManager.playSuccess();
-                            setIsCardFlipped(false);
-                            setCurrentCardIndex((prev) => (prev + 1) % srsDeck.length);
-                            const nextXp = userXp + 5;
-                            setUserXp(nextXp);
-                            AppStorage.saveXp(nextXp);
-                            setSrsCardsReviewedCount((c) => c + 1);
-                          }}
-                          className="p-3.5 rounded-2xl bg-blue-950/40 hover:bg-blue-900/60 border border-blue-500/30 text-blue-200 transition font-bold text-xs flex flex-col items-center gap-1 shadow-xs"
-                        >
-                          <span className="text-sm">👍 Bien</span>
-                          <span className="text-[10px] text-blue-400 font-normal">+5 XP</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            soundManager.playVictory();
-                            setIsCardFlipped(false);
-                            setCurrentCardIndex((prev) => (prev + 1) % srsDeck.length);
-                            const nextXp = userXp + 10;
-                            setUserXp(nextXp);
-                            AppStorage.saveXp(nextXp);
-                            setSrsCardsReviewedCount((c) => c + 1);
-                          }}
-                          className="p-3.5 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-emerald-200 transition font-bold text-xs flex flex-col items-center gap-1 shadow-xs"
-                        >
-                          <span className="text-sm">⭐ Fácil</span>
-                          <span className="text-[10px] text-emerald-400 font-normal">+10 XP</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex justify-center gap-3">
-                        <button
-                          onClick={() => setIsCardFlipped(true)}
-                          className="px-8 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs transition shadow-md shadow-blue-600/30"
-                        >
-                          Voltear Tarjeta
-                        </button>
-                        <button
-                          onClick={() => {
-                            setCurrentCardIndex((prev) => (prev + 1) % srsDeck.length);
-                            soundManager.playClick();
-                          }}
-                          className="px-5 py-3 rounded-2xl bg-[#0c111c] hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold transition"
-                        >
-                          Saltar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()
-            )}
-          </main>
+          <SrsGame
+            srsDeck={srsDeck}
+            currentCardIndex={currentCardIndex}
+            isCardFlipped={isCardFlipped}
+            srsLevelFilter={srsLevelFilter}
+            srsCardsReviewedCount={srsCardsReviewedCount}
+            userXp={userXp}
+            onFilterChange={(lvl) => setSrsLevelFilter(lvl)}
+            onCardFlip={(flipped) => setIsCardFlipped(flipped)}
+            onNextCard={() => setCurrentCardIndex(prev => (prev + 1) % Math.max(1, srsDeck.length))}
+            onReviewCard={(difficulty) => {
+              const xpBonus = difficulty === 'easy' ? 15 : difficulty === 'good' ? 10 : 5;
+              const nextXp = userXp + xpBonus;
+              setUserXp(nextXp);
+              AppStorage.saveXp(nextXp);
+              setSrsCardsReviewedCount(prev => prev + 1);
+              setIsCardFlipped(false);
+              setCurrentCardIndex(prev => (prev + 1) % Math.max(1, srsDeck.length));
+              soundManager.playSuccess();
+              triggerCloudSync();
+            }}
+            onSpeakText={(text) => speakText(text)}
+          />
         )}
 
         {/* Barra de Navegación Inferior para Móviles (md:hidden) */}
@@ -3528,9 +2734,8 @@ function FluentiaPathContent() {
               setCurrentView('PATH');
               soundManager.playClick();
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${
-              currentView === 'PATH' ? 'text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
-            }`}
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${currentView === 'PATH' ? 'text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
           >
             <MapPin className="w-5 h-5" />
             <span className="text-[10px]">Ruta</span>
@@ -3540,9 +2745,8 @@ function FluentiaPathContent() {
               setCurrentView('IMMERSION');
               soundManager.playClick();
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${
-              currentView === 'IMMERSION' ? 'text-teal-300 font-bold bg-teal-950/60 border border-teal-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
-            }`}
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${currentView === 'IMMERSION' ? 'text-teal-300 font-bold bg-teal-950/60 border border-teal-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
           >
             <BookOpen className="w-5 h-5" />
             <span className="text-[10px]">Inmersión</span>
@@ -3552,9 +2756,8 @@ function FluentiaPathContent() {
               setCurrentView('SYLLABUS');
               soundManager.playClick();
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${
-              currentView === 'SYLLABUS' ? 'text-cyan-300 font-bold bg-cyan-950/60 border border-cyan-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
-            }`}
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${currentView === 'SYLLABUS' ? 'text-cyan-300 font-bold bg-cyan-950/60 border border-cyan-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
           >
             <ListTree className="w-5 h-5" />
             <span className="text-[10px]">Temario</span>
@@ -3564,9 +2767,8 @@ function FluentiaPathContent() {
               setCurrentView('PROJECTS');
               soundManager.playClick();
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${
-              currentView === 'PROJECTS' ? 'text-purple-300 font-bold bg-purple-950/60 border border-purple-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
-            }`}
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${currentView === 'PROJECTS' ? 'text-purple-300 font-bold bg-purple-950/60 border border-purple-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
           >
             <FileText className="w-5 h-5" />
             <span className="text-[10px]">Taller</span>
@@ -3576,9 +2778,8 @@ function FluentiaPathContent() {
               setCurrentView('REVIEW');
               soundManager.playClick();
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${
-              currentView === 'REVIEW' ? 'text-amber-300 font-bold bg-amber-950/60 border border-amber-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
-            }`}
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition ${currentView === 'REVIEW' ? 'text-amber-300 font-bold bg-amber-950/60 border border-amber-500/30 shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
           >
             <Brain className="w-5 h-5" />
             <span className="text-[10px]">Repaso</span>
@@ -3605,1104 +2806,37 @@ function FluentiaPathContent() {
         )}
       </AnimatePresence>
 
-      {/* =========================================================================
-          LESSON RUNNER DE 6 ETAPAS INTERACTIVAS (A PANTALLA COMPLETA)
-      ========================================================================= */}
+      {/* LESSON RUNNER DE 6 ETAPAS INTERACTIVAS (MODULAR) */}
       <AnimatePresence>
         {activeLesson && (
-          <div className="fixed inset-0 z-50 bg-[#07090e] flex flex-col text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300">
-
-            {/* Top Bar de Progreso Segmentada Estilo Duolingo Pro */}
-            <header className="border-b border-slate-800 px-4 md:px-8 py-3.5 bg-[#090d16]/95 backdrop-blur-xl flex items-center justify-between gap-4 shadow-sm">
-              <button
-                onClick={() => {
-                  stopContinuousDialogue();
-                  setActiveLesson(null);
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0c111c] hover:bg-slate-800 text-slate-300 hover:text-white transition border border-slate-700 text-xs font-semibold"
-                title="Cerrar lección (Esc)"
-              >
-                <X className="w-4 h-4" />
-                <span className="hidden sm:inline">Ruta</span>
-              </button>
-
-              {/* Segmented Progress Bar */}
-              <div className="flex-1 max-w-xl mx-auto space-y-1.5 text-center">
-                <div className="flex items-center justify-between text-[11px] font-mono">
-                  <span className={`${activeTheme.accentText} font-bold uppercase tracking-wider`}>
-                    {currentStep === 1 && '1/6 • Inmersión Sonora (Input Comprensible i+1)'}
-                    {currentStep === 2 && '2/6 • Comprensión Global e Inferencia'}
-                    {currentStep === 3 && '3/6 • Reconstruye la Historia (Significado Primero)'}
-                    {currentStep === 4 && '4/6 • Laboratorio de Shadowing y Fonética IPA'}
-                    {currentStep === 5 && '5/6 • Noticing Comunicativo (Atención Consciente Opcional)'}
-                    {currentStep === 6 && '6/6 • Reto de Desbloqueo y Producción'}
-                  </span>
-                  <span className="text-slate-400 font-medium truncate max-w-[200px]">
-                    {activeLesson.code} • {activeLesson.title}
-                  </span>
-                </div>
-
-                {/* 6 Segmentos Visuales */}
-                <div className="grid grid-cols-6 gap-1.5 h-2">
-                  {[1, 2, 3, 4, 5, 6].map((stepNum) => {
-                    const isDone = currentStep > stepNum;
-                    const isCurrent = currentStep === stepNum;
-                    return (
-                      <div
-                        key={stepNum}
-                        className={`h-full rounded-full transition-all duration-300 ${isDone
-                          ? activeTheme.progressDone
-                          : isCurrent
-                            ? `${activeTheme.progressCurrent} animate-pulse`
-                            : 'bg-slate-800/80'
-                          }`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Controles de Velocidad, Atajos y XP */}
-              <div className="flex items-center gap-2.5">
-                <div className="hidden lg:flex items-center gap-1.5 text-[11px] font-mono text-slate-400 bg-[#0c111c] border border-slate-800 px-2.5 py-1 rounded-xl">
-                  <Keyboard className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>[Espacio] Audio • [1-4] Opciones • [Enter] Siguiente</span>
-                </div>
-
-                <div className="hidden sm:flex items-center bg-[#0c111c] border border-slate-800 rounded-xl p-0.5 text-[10px] font-mono font-bold">
-                  <button
-                    onClick={() => setAudioSpeed(0.8)}
-                    className={`px-2 py-1 rounded-lg transition ${audioSpeed === 0.8 ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    0.8x
-                  </button>
-                  <button
-                    onClick={() => setAudioSpeed(1.0)}
-                    className={`px-2 py-1 rounded-lg transition ${audioSpeed === 1.0 ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    1.0x
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl shadow-sm">
-                  <Zap className="w-3.5 h-3.5 fill-current text-amber-400" />
-                  <span>+{activeLesson.xpReward} XP</span>
-                </div>
-              </div>
-            </header>
-
-            {/* Contenedor Principal con Scroll Limpio */}
-            <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 max-w-3xl mx-auto w-full space-y-6">
-              <AnimatePresence mode="wait">
-
-                {/* =========================================================
-                    ETAPA 1: INMERSIÓN SONORA EXTENSA (CHAT VIVO INTERACTIVO)
-                ========================================================= */}
-                {currentStep === 1 && (
-                  <motion.div
-                    key="step-1"
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -14 }}
-                    className="space-y-6"
-                  >
-                    {/* Tarjeta de la Escena Contextual */}
-                    <div className="p-4 rounded-2xl bg-[#0c111c]/90 border border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                          <Compass className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
-                            Inmersión Contextual • Input Comprensible
-                          </span>
-                          <p className="text-xs text-slate-300 font-medium">
-                            {activeLesson.step1_dialogue.context}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        {/* Toggle de Traducciones para evitar traducción mental */}
-                        <button
-                          onClick={() => setShowTranslations(!showTranslations)}
-                          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition ${showTranslations
-                            ? 'bg-[#0e1626] text-slate-300 border-slate-700 hover:text-white'
-                            : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
-                            }`}
-                          title="Alternar visibilidad del español"
-                        >
-                          {showTranslations ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                          <span className="text-[11px]">{showTranslations ? 'Ocultar Español' : 'Ver Español'}</span>
-                        </button>
-
-                        {/* Toggle de Ayuda Fonética Opcional */}
-                        <button
-                          onClick={() => setShowFigurativeHelper(!showFigurativeHelper)}
-                          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition ${showFigurativeHelper
-                            ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
-                            : 'bg-[#0e1626] text-slate-300 hover:text-amber-300 border-slate-700'
-                            }`}
-                          title="Mostrar/Ocultar ayuda fonética aproximada como apoyo secundario"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="text-[11px]">{showFigurativeHelper ? 'Ocultar Apoyo' : 'Apoyo Fonético'}</span>
-                        </button>
-
-                        {/* Reproductor de Diálogo Continuo e Inmersivo */}
-                        <button
-                          onClick={playContinuousDialogue}
-                          className={`flex items-center gap-2 text-xs font-bold px-3.5 py-1.5 rounded-xl transition shadow-md ${
-                            isContinuousPlaying
-                              ? 'bg-rose-600 text-white shadow-rose-600/30 animate-pulse'
-                              : 'bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-slate-950 font-black shadow-emerald-500/20'
-                          }`}
-                        >
-                          {isContinuousPlaying ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                          <span>{isContinuousPlaying ? 'Detener Diálogo' : 'Todo el Diálogo'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Flujo Conversacional en Formato de Chat */}
-                    <div className="space-y-4 pt-1">
-                      {activeLesson.step1_dialogue.lines.map((line, idx) => {
-                        const isStudent = line.speaker.toLowerCase().includes('david') || line.speaker.toLowerCase().includes('learner') || line.speaker.toLowerCase().includes('candidate');
-                        const isPlayingThisLine = activeAudioIndex === idx;
-                        const isRevealed = showTranslations || revealedLineIndexes.includes(idx);
-                        const isStarred = starredPhrases.some(
-                          (p) => p.en.trim().toLowerCase() === line.en.trim().toLowerCase()
-                        );
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`flex items-start gap-3 ${isStudent ? 'flex-row-reverse' : 'flex-row'}`}
-                          >
-                            {/* Avatar del Hablante */}
-                            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 border transition-transform ${isPlayingThisLine ? 'scale-110 ring-2 ring-emerald-400' : ''} ${isStudent
-                              ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300 shadow-sm'
-                              : 'bg-[#0e1626] border-slate-700 text-slate-300 shadow-sm'
-                              }`}>
-                              {isStudent ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                            </div>
-
-                            {/* Burbuja del Mensaje con Iluminación Activa */}
-                            <div className={`max-w-[85%] sm:max-w-[78%] rounded-2xl p-4 transition duration-200 border-2 shadow-sm ${
-                              isPlayingThisLine
-                                ? 'ring-2 ring-emerald-500 shadow-md border-emerald-500'
-                                : ''
-                            } ${isStudent
-                              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100 rounded-tr-sm hover:border-emerald-400'
-                              : 'bg-[#0e1626]/90 border-slate-800 text-slate-100 rounded-tl-sm hover:border-slate-700'
-                              }`}>
-                              <div className="flex items-center justify-between gap-4 pb-1.5">
-                                <span className={`text-[10px] font-mono font-bold tracking-wider uppercase ${isStudent ? 'text-emerald-300' : 'text-slate-400'
-                                  }`}>
-                                  {line.speaker}
-                                </span>
-
-                                <div className="flex items-center gap-2">
-                                  {/* Botón Frase Estrella ⭐ para Repaso SRS */}
-                                  <button
-                                    onClick={() => handleToggleStarPhrase(line, activeLesson)}
-                                    className={`p-1.5 rounded-lg transition ${
-                                      isStarred
-                                        ? 'text-amber-400 bg-amber-500/20 ring-1 ring-amber-400/40 shadow-xs'
-                                        : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800'
-                                    }`}
-                                    title={isStarred ? "Frase Estrella guardada en tu mazo SRS (⭐)" : "Añadir a mi mazo SRS como Frase Estrella (⭐)"}
-                                  >
-                                    <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-amber-400 text-amber-400' : ''}`} />
-                                  </button>
-
-                                  {/* Botón de Audio con Visualizador de Onda */}
-                                  <button
-                                    onClick={() => {
-                                      if (isContinuousPlaying) stopContinuousDialogue();
-                                      speakText(line.en, idx, isStudent ? 1.08 : 0.94);
-                                    }}
-                                    className={`p-1.5 rounded-lg transition ${isPlayingThisLine
-                                      ? 'text-emerald-300 bg-emerald-950/80 ring-2 ring-emerald-500/40'
-                                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                                      }`}
-                                    title="Escuchar pronunciación nativa"
-                                  >
-                                    {isPlayingThisLine ? (
-                                      <div className="flex items-center gap-0.5 h-3.5 px-0.5">
-                                        <span className="w-0.5 bg-emerald-400 h-2.5 animate-pulse rounded-full" />
-                                        <span className="w-0.5 bg-emerald-300 h-3.5 animate-bounce rounded-full" />
-                                        <span className="w-0.5 bg-emerald-400 h-2 animate-pulse rounded-full" />
-                                      </div>
-                                    ) : (
-                                      <Volume2 className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Texto en Inglés (Tipografía Limpia y Grande) */}
-                              <p className="text-base text-white font-semibold leading-relaxed">
-                                {line.en}
-                              </p>
-
-                              {/* Apoyo Fonético Opcional (solo visible si el usuario activa el botón de ayuda) */}
-                              {showFigurativeHelper && line.phonetic && (
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <span className="font-mono text-[11px] text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                                    IPA: {line.phonetic}
-                                  </span>
-                                </div>
-                              )}
-
-                              {/* Traducción con Revelación Gradual */}
-                              {isRevealed ? (
-                                <p className="text-xs text-slate-400 font-normal pt-2 mt-1.5 border-t border-slate-800 leading-normal">
-                                  {line.es}
-                                </p>
-                              ) : (
-                                <button
-                                  onClick={() => toggleLineTranslation(idx)}
-                                  className="text-[10px] text-slate-400 hover:text-emerald-400 transition pt-1.5 flex items-center gap-1 block font-medium"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  <span>Toca para ver traducción</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* =========================================================
-                    ETAPA 2: COMPRENSIÓN AUDITIVA GIST
-                ========================================================= */}
-                {currentStep === 2 && (
-                  <motion.div
-                    key="step-2"
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -14 }}
-                    className="space-y-6"
-                  >
-                    {/* Caja de Audio Clave */}
-                    <div className="p-5 rounded-2xl bg-[#0c111c]/90 border border-slate-800 flex items-center justify-between gap-4 shadow-sm">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                          <Headphones className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
-                            Pasaje Auditivo Clave
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            Escucha la pista sonora y deduce el sentido global:
-                          </span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => speakText(activeLesson.step2_comprehension.audioContextText)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-slate-950 font-black text-xs transition shadow-sm"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                        <span>Reproducir Pasaje</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold">
-                        Pregunta de Comprensión
-                      </span>
-                      <h2 className="text-lg md:text-xl font-bold text-white leading-snug">
-                        {activeLesson.step2_comprehension.prompt}
-                      </h2>
-                    </div>
-
-                    {/* Opciones con Letras Grandes */}
-                    <div className="space-y-3">
-                      {activeLesson.step2_comprehension.options.map((opt, idx) => {
-                        const isSelected = step2SelectedIdx === idx;
-                        const isCorrect = idx === activeLesson.step2_comprehension.correctIndex;
-                        const letters = ['A', 'B', 'C', 'D'];
-
-                        let style = 'bg-[#0c111c] border-2 border-slate-800 text-slate-200 hover:border-slate-700 hover:bg-[#111928] shadow-xs';
-                        if (isSelected) {
-                          style = isCorrect
-                            ? 'bg-emerald-950/50 border-2 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500/40 font-semibold'
-                            : 'bg-amber-950/50 border-2 border-amber-500 text-amber-100 ring-1 ring-amber-500/40 font-semibold';
-                        }
-
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setStep2SelectedIdx(idx);
-                              if (isCorrect) {
-                                soundManager.playSuccess();
-                              } else {
-                                soundManager.playGentleError();
-                              }
-                            }}
-                            className={`w-full text-left p-4 rounded-2xl border text-sm font-medium transition flex items-center justify-between gap-4 shadow-sm ${style}`}
-                          >
-                            <div className="flex items-center gap-3.5">
-                              <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs border ${isSelected
-                                ? (isCorrect ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black' : 'bg-amber-500 text-slate-950 border-amber-400 font-black')
-                                : 'bg-[#080c14] border-slate-800 text-slate-400'
-                                }`}>
-                                {letters[idx]}
-                              </span>
-                              <span>{opt}</span>
-                            </div>
-                            {isSelected && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {step2SelectedIdx !== null && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-200 leading-relaxed space-y-1 shadow-xs"
-                      >
-                        <span className="font-bold font-mono uppercase text-[10px] text-emerald-300 block">
-                          💡 Explicación del Sentido Global:
-                        </span>
-                        <p>{activeLesson.step2_comprehension.explanation}</p>
-                      </motion.div>
-                    )}
-                  </motion.div>
-                )}
-
-                {/* =========================================================
-                    ETAPA 3: RECONSTRUYE LA HISTORIA (SIGNIFICADO PRIMERO)
-                ========================================================= */}
-                {currentStep === 3 && (
-                  <motion.div
-                    key="step-3"
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -14 }}
-                    className="space-y-6"
-                  >
-                    {activeLesson.step3_story_sequence?.events && activeLesson.step3_story_sequence.events.length > 0 ? (
-                      /* MODO PRINCIPAL: RECONSTRUYE LA HISTORIA NARRATIVA */
-                      <div className="space-y-6">
-                        <div className="space-y-2 text-center max-w-xl mx-auto">
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-teal-300 font-bold bg-teal-950/60 border border-teal-500/30 px-3 py-1 rounded-full">
-                            Etapa 3 • Reconstruye la Historia (Significado Primero)
-                          </span>
-                          <h2 className="text-base md:text-lg font-bold text-white pt-1">
-                            {activeLesson.step3_story_sequence.instruction || "Ordena los eventos según ocurrieron en la conversación"}
-                          </h2>
-                          <p className="text-xs text-slate-400">
-                            Toca cada evento en orden cronológico (1º, 2º, 3º). La sintaxis emerge de la narrativa.
-                          </p>
-                        </div>
-
-                        {/* Secuencia seleccionada */}
-                        <div className="p-4 rounded-2xl bg-[#080c14] border-2 border-dashed border-slate-700 min-h-[90px] flex flex-col gap-2">
-                          {selectedStoryEventIds.length === 0 ? (
-                            <div className="text-center text-xs text-slate-500 py-4 italic">
-                              Toca los sucesos de abajo en el orden temporal en que sucedieron...
-                            </div>
-                          ) : (
-                            selectedStoryEventIds.map((id, index) => {
-                              const ev = activeLesson.step3_story_sequence?.events.find((e: StoryEvent) => e.id === id);
-                              if (!ev) return null;
-                              return (
-                                <div
-                                  key={id}
-                                  onClick={() => handleSelectStoryEvent(id)}
-                                  className="flex items-center gap-3 p-3 rounded-xl bg-[#0e1626] border border-teal-500/40 shadow-xs cursor-pointer hover:border-teal-400 transition"
-                                  title="Toca para remover de la secuencia"
-                                >
-                                  <span className="w-7 h-7 rounded-lg bg-teal-500 text-slate-950 font-mono font-black text-xs flex items-center justify-center shrink-0">
-                                    {index + 1}º
-                                  </span>
-                                  <div className="text-left flex-1">
-                                    <p className="text-xs font-bold text-white">{ev.en}</p>
-                                    <p className="text-[11px] text-slate-400 italic">{ev.es}</p>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-
-                        {/* Eventos disponibles para ordenar */}
-                        <div className="space-y-3">
-                          {activeLesson.step3_story_sequence.events.map((ev: StoryEvent) => {
-                            const isChosen = selectedStoryEventIds.includes(ev.id);
-                            const orderNum = selectedStoryEventIds.indexOf(ev.id) + 1;
-                            return (
-                              <button
-                                key={ev.id}
-                                onClick={() => handleSelectStoryEvent(ev.id)}
-                                className={`w-full text-left p-4 rounded-2xl border transition flex items-center justify-between gap-4 ${
-                                  isChosen
-                                    ? 'bg-[#0e1626]/40 border-slate-800 opacity-50'
-                                    : 'bg-[#0c111c] hover:bg-[#111928] border-slate-800 hover:border-teal-500/40 shadow-xs'
-                                }`}
-                              >
-                                <div className="space-y-0.5">
-                                  <p className="text-sm font-semibold text-white">{ev.en}</p>
-                                  <p className="text-xs text-slate-400 italic">{ev.es}</p>
-                                </div>
-                                {isChosen ? (
-                                  <span className="w-6 h-6 rounded-full bg-teal-500 text-slate-950 text-xs font-mono font-bold flex items-center justify-center shrink-0">
-                                    {orderNum}
-                                  </span>
-                                ) : (
-                                  <span className="w-6 h-6 rounded-full border border-slate-700 text-slate-400 text-xs font-mono flex items-center justify-center shrink-0">
-                                    +
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Botón de Reset y Feedback */}
-                        <div className="flex justify-center items-center gap-3 pt-1">
-                          <button
-                            onClick={handleResetStoryEvents}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0c111c] text-slate-300 hover:text-white hover:bg-slate-800 text-xs border border-slate-700 transition font-medium"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Reiniciar Orden</span>
-                          </button>
-                        </div>
-
-                        {storyOrderCorrect === true && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-200 text-center font-bold shadow-xs"
-                          >
-                            ✨ ¡Excelente Reconstrucción! Has capturado con precisión la cronología y el significado de los eventos del diálogo.
-                          </motion.div>
-                        )}
-                        {storyOrderCorrect === false && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 text-center font-medium shadow-xs"
-                          >
-                            💡 Revisa qué ocurrió al inicio de la conversación y qué se dijo hacia el final. Puedes tocar cualquier elemento para ajustar.
-                          </motion.div>
-                        )}
-                      </div>
-                    ) : (
-                      /* FALLBACK: CONSTRUCTOR SINTÁCTICO DE PALABRAS */
-                      <>
-                        <div className="space-y-2 text-center max-w-xl mx-auto">
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-teal-300 font-bold bg-teal-950/60 border border-teal-500/30 px-3 py-1 rounded-full">
-                            Etapa 3 • Sintaxis y Automatización
-                          </span>
-                          <h2 className="text-base md:text-lg font-bold text-white pt-1">
-                            {activeLesson.step3_builder.instruction}
-                          </h2>
-                          <div className="p-3 rounded-xl bg-[#080c14] border border-slate-800 text-emerald-300 font-semibold text-sm shadow-xs">
-                            &ldquo;{activeLesson.step3_builder.targetTranslationEs}&rdquo;
-                          </div>
-                        </div>
-
-                        {/* Zona Magnética de Palabras Seleccionadas */}
-                        <div className="min-h-[85px] p-4 rounded-2xl bg-[#080c14] border-2 border-dashed border-slate-700 flex flex-wrap gap-2.5 items-center justify-center transition shadow-inner">
-                          {selectedTokens.length === 0 ? (
-                            <span className="text-xs text-slate-500 italic">
-                              Toca las palabras de abajo en el orden natural en inglés...
-                            </span>
-                          ) : (
-                            selectedTokens.map((token) => (
-                              <motion.button
-                                key={token.id}
-                                layout
-                                initial={{ scale: 0.8, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                onClick={() => handleDeselectToken(token.id)}
-                                className="bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs shadow-sm hover:opacity-90 transition active:scale-95"
-                                title="Toca para remover"
-                              >
-                                {token.text}
-                              </motion.button>
-                            ))
-                          )}
-                        </div>
-
-                        {/* Banco de Palabras Disponibles (Mapeo por ID único) */}
-                        <div className="flex flex-wrap gap-2.5 justify-center pt-1">
-                          {availableTokens.map((token) => {
-                            const isUsed = selectedTokens.some((t) => t.id === token.id);
-                            return (
-                              <button
-                                key={token.id}
-                                onClick={() => handleSelectToken(token)}
-                                disabled={isUsed}
-                                className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition duration-150 ${isUsed
-                                  ? 'opacity-30 border-slate-800 bg-[#080c14] cursor-not-allowed text-slate-600'
-                                  : 'bg-[#0c111c] hover:bg-[#111928] border-2 border-slate-800 hover:border-slate-700 text-slate-200 shadow-xs active:translate-y-0.5'
-                                  }`}
-                              >
-                                {token.text}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Botones de Control */}
-                        <div className="flex justify-center items-center gap-3 pt-2">
-                          <button
-                            onClick={handleResetTokens}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0c111c] text-slate-300 hover:text-white hover:bg-slate-800 text-xs border border-slate-700 transition font-medium"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Reiniciar</span>
-                          </button>
-
-                          <button
-                            onClick={checkSentenceBuilder}
-                            disabled={selectedTokens.length === 0}
-                            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 disabled:opacity-30 text-slate-950 font-black text-xs transition shadow-sm"
-                          >
-                            Comprobar Frase
-                          </button>
-                        </div>
-
-                        {builderStatus === 'CORRECT' && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-200 text-center font-bold shadow-xs"
-                          >
-                            ✨ ¡Sintaxis Perfecta! Has ensamblado los elementos respetando el orden natural del inglés.
-                          </motion.div>
-                        )}
-                        {builderStatus === 'WRONG' && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 text-center font-medium shadow-xs"
-                          >
-                            Casi. Revisa la colocación de los adverbios y auxiliares y vuelve a intentarlo.
-                          </motion.div>
-                        )}
-                      </>
-                    )}
-                  </motion.div>
-                )}
-
-                {/* =========================================================
-                    ETAPA 4: SHADOWING STUDIO (LABORATORIO FONÉTICO)
-                ========================================================= */}
-                {currentStep === 4 && (
-                  <motion.div
-                    key="step-4"
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -14 }}
-                    className="space-y-6"
-                  >
-                    <div className="space-y-1 text-center">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-300 font-bold bg-cyan-950/60 border border-cyan-500/30 px-3 py-1 rounded-full">
-                        Etapa 4 • Fonética Enlazada & Shadowing
-                      </span>
-                      <h2 className="text-base md:text-lg font-bold text-white pt-1">
-                        {activeLesson.step4_shadowing.instruction}
-                      </h2>
-                    </div>
-
-                    {/* Selector de Frases de Shadowing */}
-                    <div className="space-y-3.5">
-                      {activeLesson.step4_shadowing.phrases.map((phrase, idx) => {
-                        const isCurrentActivePhrase = activeShadowingPhraseIdx === idx;
-                        return (
-                          <div 
-                            key={idx} 
-                            onClick={() => {
-                              setActiveShadowingPhraseIdx(idx);
-                              setPronunciationResult(null);
-                              setSpokenTranscript('');
-                              soundManager.playClick();
-                            }}
-                            className={`p-4 md:p-5 rounded-2xl cursor-pointer transition space-y-2.5 shadow-xs border-2 ${
-                              isCurrentActivePhrase
-                                ? 'bg-[#0e1626] border-cyan-500 ring-2 ring-cyan-500/20 shadow-md text-white'
-                                : 'bg-[#0c111c]/90 border-slate-800 hover:border-slate-700 hover:bg-[#111928] text-slate-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-0.5 rounded-md font-bold uppercase">
-                                {phrase.levelLabel} {isCurrentActivePhrase && '• Seleccionada'}
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  speakText(phrase.en);
-                                }}
-                                className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-emerald-400 transition bg-[#080c14] px-3 py-1.5 rounded-xl border border-slate-800 font-medium"
-                              >
-                                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Escuchar Modelo</span>
-                              </button>
-                            </div>
-
-                            <h3 className="text-base md:text-lg font-bold text-white">
-                              &ldquo;{phrase.en}&rdquo;
-                            </h3>
-
-                            {/* Fonética IPA Técnica como Estándar */}
-                            <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                              <span className="font-mono text-xs font-bold text-cyan-300 bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-500/40 shadow-xs" title="Alfabeto Fonético Internacional">
-                                IPA: {phrase.phonetic}
-                              </span>
-                              {showFigurativeHelper && (
-                                <span className="text-xs font-medium text-amber-300 bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-500/30 italic">
-                                  💡 Suena parecido a: &ldquo;{getFigurativePronunciation(phrase.en, phrase.phonetic)}&rdquo;
-                                </span>
-                              )}
-                            </div>
-
-                            <p className="text-[11px] text-slate-400 pt-1.5 border-t border-slate-800 flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              <span>{phrase.tip}</span>
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Consola de Grabación y Reconocimiento de Voz Real (Web Speech API) */}
-                    {(() => {
-                      const activePhrase = activeLesson.step4_shadowing.phrases[activeShadowingPhraseIdx] || activeLesson.step4_shadowing.phrases[0];
-                      return (
-                        <div className="p-6 rounded-3xl bg-[#0c111c]/90 border border-slate-800 flex flex-col items-center justify-center gap-4 text-center shadow-sm">
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
-                              Práctica Activa de Voz (Frase {activeShadowingPhraseIdx + 1} de {activeLesson.step4_shadowing.phrases.length})
-                            </span>
-                            <p className="text-xs text-slate-400">
-                              Activa tu micrófono, emula la entonación y habla claramente en inglés:
-                            </p>
-                          </div>
-
-                          {/* Botón Principal de Micrófono */}
-                          <div className="flex items-center gap-3">
-                            {isRecording ? (
-                              <button
-                                onClick={handleStopSpeechPractice}
-                                className="flex items-center gap-2.5 text-xs font-black px-7 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white animate-pulse shadow-lg shadow-rose-600/30 transition"
-                              >
-                                <div className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-                                <span>Detener Grabación y Evaluar</span>
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleStartSpeechPractice(activePhrase.en)}
-                                className="flex items-center gap-2.5 text-xs font-black px-7 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-95 text-slate-950 shadow-md shadow-cyan-500/20 transition"
-                              >
-                                <Mic className="w-4 h-4 text-slate-950" />
-                                <span>Grabar Mi Voz con Micrófono Real</span>
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Transcripción en vivo mientras habla */}
-                          {isRecording && (
-                            <div className="p-3 rounded-xl bg-[#080c14] border border-slate-800 max-w-md w-full">
-                              <span className="text-[10px] text-slate-400 font-mono block">Capturando tu voz en vivo:</span>
-                              <p className="text-sm font-bold text-cyan-300 italic">
-                                &ldquo;{spokenTranscript || 'Habla ahora...'}&rdquo;
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Mensaje de Error / Fallback amigable */}
-                          {speechError && (
-                            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 max-w-md">
-                              {speechError}
-                            </div>
-                          )}
-
-                          {/* Resultados de Evaluación Fonética Tokenizada */}
-                          {pronunciationResult && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="p-5 rounded-2xl bg-[#080c14] border-2 border-cyan-500/40 w-full max-w-lg space-y-3.5 text-left shadow-xs"
-                            >
-                              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                  <Activity className="w-4 h-4 text-cyan-400" />
-                                  <span>Diagnóstico de Articulación y Ritmo</span>
-                                </span>
-                                <span className={`text-xs font-mono font-black px-2.5 py-0.5 rounded-full border ${
-                                  pronunciationResult.accuracyScore >= 70
-                                    ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
-                                    : 'bg-amber-950/60 text-amber-300 border-amber-500/40'
-                                }`}>
-                                  {pronunciationResult.accuracyScore}% Precisión
-                                </span>
-                              </div>
-
-                              {/* Fichas de Palabras Identificadas */}
-                              <div className="space-y-1.5">
-                                <span className="text-[10px] font-mono text-slate-400 block uppercase">
-                                  Validación por Término:
-                                </span>
-                                <div className="flex flex-wrap gap-2">
-                                  {pronunciationResult.wordResults.map((wRes, wIdx) => (
-                                    <span
-                                      key={wIdx}
-                                      className={`text-xs px-2.5 py-1 rounded-lg border font-mono font-medium ${
-                                        wRes.isMatched
-                                          ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 font-bold'
-                                          : wRes.isPartial
-                                          ? 'bg-amber-950/60 border-amber-500/40 text-amber-300 font-bold'
-                                          : 'bg-slate-900 border-slate-800 text-slate-600 line-through'
-                                      }`}
-                                    >
-                                      {wRes.word}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <p className="text-xs text-slate-300 leading-relaxed pt-1">
-                                {pronunciationResult.feedbackMessage}
-                              </p>
-                            </motion.div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </motion.div>
-                )}
-
-                {/* =========================================================
-                    ETAPA 5: NOTICING OPCIONAL (ATENCIÓN CONSCIENTE SIN CASTIGO)
-                ========================================================= */}
-                {currentStep === 5 && (
-                  <motion.div
-                    key="step-5"
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -14 }}
-                    className="space-y-6"
-                  >
-                    <div className="space-y-2 text-center max-w-xl mx-auto">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-purple-300 font-bold bg-purple-950/60 border border-purple-500/30 px-3 py-1 rounded-full">
-                        Etapa 5 • Noticing Opcional (Atención Consciente)
-                      </span>
-                      <h2 className="text-base md:text-lg font-bold text-white pt-1">
-                        {activeLesson.step5_noticing?.concept || activeLesson.step5_monitor.explanationConcept}
-                      </h2>
-                      <p className="text-xs text-slate-400">
-                        Paso voluntario de baja ansiedad. Explora los matices pragmáticos si deseas reflexionar, o avanza directamente a la etapa 6.
-                      </p>
-                    </div>
-
-                    {/* Tarjeta Desplegable de Noticing (Reflexión Pragmática) */}
-                    <div className="p-5 md:p-6 rounded-3xl bg-[#0c111c]/90 border border-purple-500/40 shadow-sm space-y-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-300 flex items-center justify-center font-bold text-xs">
-                            💡
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-mono uppercase text-purple-300 font-bold block">
-                              Frase Observada en el Diálogo:
-                            </span>
-                            <strong className="text-sm text-white">
-                              &ldquo;{activeLesson.step5_noticing?.quoteEn || activeLesson.step1_dialogue.lines[0]?.en}&rdquo;
-                            </strong>
-                            {activeLesson.step5_noticing?.quoteEs && (
-                              <span className="text-xs text-slate-400 block italic">
-                                &ldquo;{activeLesson.step5_noticing.quoteEs}&rdquo;
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => setNoticingExpanded(!noticingExpanded)}
-                          className="text-xs font-bold text-purple-300 hover:text-white px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/30 transition"
-                        >
-                          {noticingExpanded ? 'Ocultar Análisis' : '¿Por qué se dice así?'}
-                        </button>
-                      </div>
-
-                      {noticingExpanded && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="pt-3 border-t border-slate-800 space-y-3 text-xs text-slate-300 leading-relaxed"
-                        >
-                          <div className="p-3.5 rounded-2xl bg-purple-950/30 border border-purple-500/30 space-y-1.5">
-                            <span className="font-bold text-purple-200 block text-[11px] font-mono uppercase">
-                              🌱 Razón Pragmática y Comunicativa:
-                            </span>
-                            <p>
-                              {activeLesson.step5_noticing?.explanation || activeLesson.step5_monitor.ruleInsight}
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
-                    </div>
-
-                    {/* Comprensión Pragmática: Intención del Hablante (Sin penalización) */}
-                    {activeLesson.step5_noticing?.pragmaticChoice ? (
-                      <div className="space-y-3">
-                        <div className="text-center">
-                          <p className="text-xs font-semibold text-slate-300">
-                            {activeLesson.step5_noticing.pragmaticChoice.prompt}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                          {activeLesson.step5_noticing.pragmaticChoice.options.map((opt: string, optIdx: number) => {
-                            const isChosen = step5SelectedIdx === optIdx;
-                            const isCorrect = optIdx === activeLesson.step5_noticing?.pragmaticChoice?.correctIndex;
-
-                            return (
-                              <button
-                                key={optIdx}
-                                onClick={() => {
-                                  setStep5SelectedIdx(optIdx);
-                                  if (isCorrect) soundManager.playSuccess();
-                                  else soundManager.playClick();
-                                }}
-                                className={`p-4 rounded-2xl border text-left transition space-y-2 shadow-xs ${
-                                  isChosen
-                                    ? 'bg-purple-950/60 border-purple-500 ring-2 ring-purple-500/40 text-purple-100'
-                                    : 'bg-[#0c111c] hover:bg-[#111928] border-slate-800 text-slate-200'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#080c14] border border-slate-800 text-slate-400">
-                                    Opción {optIdx === 0 ? 'A' : 'B'}
-                                  </span>
-                                  {isCorrect && isChosen && (
-                                    <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-                                      Recomendada
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm font-bold text-white">
-                                  {opt}
-                                </p>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {step5SelectedIdx !== null && activeLesson.step5_noticing?.pragmaticChoice?.insight && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-3.5 rounded-xl bg-blue-950/30 border border-blue-500/30 text-xs text-blue-200"
-                          >
-                            💡 {activeLesson.step5_noticing.pragmaticChoice.insight}
-                          </motion.div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Fallback con opciones existentes bajo enfoque reflexivo */
-                      <div className="space-y-3">
-                        <div className="text-center text-xs text-slate-400 font-medium pb-1">
-                          ¿Cuál de estas formulaciones refleja mejor el uso natural angloparlante?
-                        </div>
-                        {activeLesson.step5_monitor.options.map((opt, idx) => {
-                          const isSelected = step5SelectedIdx === idx;
-                          const isCorrect = idx === activeLesson.step5_monitor.correctIndex;
-                          const letters = ['A', 'B', 'C'];
-
-                          return (
-                            <button
-                              key={idx}
-                              onClick={() => {
-                                setStep5SelectedIdx(idx);
-                                if (isCorrect) soundManager.playSuccess();
-                                else soundManager.playClick();
-                              }}
-                              className={`w-full text-left p-4 rounded-2xl border text-sm font-medium transition flex items-center justify-between gap-4 shadow-sm ${
-                                isSelected
-                                  ? 'bg-purple-950/60 border-2 border-purple-500 text-purple-100 font-semibold'
-                                  : 'bg-[#0c111c] border-slate-800 text-slate-200 hover:border-slate-700 hover:bg-[#111928]'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3.5">
-                                <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs border ${
-                                  isSelected ? 'bg-purple-500 text-white border-purple-400' : 'bg-[#080c14] border-slate-800 text-slate-400'
-                                }`}>
-                                  {letters[idx]}
-                                </span>
-                                <span>{opt}</span>
-                              </div>
-                              {isSelected && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-
-                {/* =========================================================
-                    ETAPA 6: RETO DE MAESTRÍA FINAL Y VICTORIA
-                ========================================================= */}
-                {currentStep === 6 && (
-                  <motion.div
-                    key="step-6"
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -14 }}
-                    className="space-y-6"
-                  >
-                    {!lessonFinished ? (
-                      <>
-                        <div className="space-y-2 text-center">
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-bold bg-amber-950/60 border border-amber-500/30 px-3 py-1 rounded-full">
-                            Etapa 6 • Reto de Desbloqueo Final
-                          </span>
-                          <h2 className="text-lg md:text-xl font-bold text-white pt-1">
-                            {activeLesson.step6_mastery.question}
-                          </h2>
-                        </div>
-
-                        <div className="space-y-3">
-                          {activeLesson.step6_mastery.options.map((opt, idx) => {
-                            const isSelected = step6SelectedIdx === idx;
-                            const isCorrect = idx === activeLesson.step6_mastery.correctIndex;
-                            const letters = ['A', 'B', 'C'];
-
-                            let style = 'bg-[#0c111c] border-2 border-slate-800 text-slate-200 hover:border-slate-700 hover:bg-[#111928] shadow-xs';
-                            if (isSelected) {
-                              style = isCorrect
-                                ? 'bg-emerald-950/50 border-2 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500/40 font-semibold'
-                                : 'bg-amber-950/50 border-2 border-amber-500 text-amber-100 ring-1 ring-amber-500/40 font-semibold';
-                            }
-
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => {
-                                  setStep6SelectedIdx(idx);
-                                  if (isCorrect) {
-                                    setLessonFinished(true);
-                                    soundManager.playSuccess();
-                                  } else {
-                                    soundManager.playGentleError();
-                                  }
-                                }}
-                                className={`w-full text-left p-4 rounded-2xl border text-sm font-medium transition flex items-center justify-between gap-4 shadow-sm ${style}`}
-                              >
-                                <div className="flex items-center gap-3.5">
-                                  <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs border ${isSelected
-                                    ? (isCorrect ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black' : 'bg-amber-500 text-slate-950 border-amber-400 font-black')
-                                    : 'bg-[#080c14] border-slate-800 text-slate-400'
-                                    }`}>
-                                    {letters[idx]}
-                                  </span>
-                                  <span>{opt}</span>
-                                </div>
-                                {isSelected && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </>
-                    ) : (
-                      /* PANTALLA DE CELEBRACIÓN Y DESBLOQUEO */
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="text-center p-8 rounded-3xl bg-[#0c111c]/95 border-2 border-emerald-500/40 shadow-2xl space-y-6 max-w-lg mx-auto"
-                      >
-                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/30">
-                          <Trophy className="w-10 h-10 stroke-[2.5]" />
-                        </div>
-
-                        <div className="space-y-2">
-                          <h2 className="text-2xl font-black text-white">¡Clase Intensiva Conquistada!</h2>
-                          <p className="text-xs text-slate-300 leading-relaxed">
-                            {activeLesson.step6_mastery.successMessage}
-                          </p>
-                        </div>
-
-                        <div className="flex justify-center gap-4 text-xs font-mono">
-                          <div className="p-3.5 rounded-2xl bg-[#080c14] border border-slate-800">
-                            <span className="text-slate-400 block text-[10px] uppercase font-bold">RECOMPENSA</span>
-                            <span className="text-emerald-400 font-extrabold text-base">+{activeLesson.xpReward} XP</span>
-                          </div>
-                          <div className="p-3.5 rounded-2xl bg-[#080c14] border border-slate-800">
-                            <span className="text-slate-400 block text-[10px] uppercase font-bold">RACHA ACTIVA</span>
-                            <span className="text-amber-400 font-extrabold text-base">3 Días 🔥</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                          <button
-                            onClick={completeLessonAndUnlockNext}
-                            className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2"
-                          >
-                            <span>Continuar Ruta de Adquisición</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              completeLessonAndUnlockNext();
-                              setCurrentView('IMMERSION');
-                              soundManager.playClick();
-                            }}
-                            className="px-5 py-3.5 rounded-2xl bg-[#0e1626] hover:bg-slate-800 text-slate-200 font-bold text-xs transition border border-slate-700 flex items-center justify-center gap-2"
-                          >
-                            <BookOpen className="w-4 h-4 text-emerald-400" />
-                            <span>Explorar Inmersión</span>
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </motion.div>
-                )}
-
-              </AnimatePresence>
-            </div>
-
-            {/* Bottom Bar de Navegación entre Etapas */}
-            {!lessonFinished && (
-              <footer className="border-t border-slate-800 px-4 md:px-8 py-3.5 bg-[#090d16]/95 backdrop-blur-xl flex items-center justify-between shadow-xs">
-                <button
-                  onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-                  disabled={currentStep === 1}
-                  className="px-4 py-2 rounded-xl bg-[#0c111c] text-slate-300 hover:bg-slate-800 hover:text-white text-xs font-bold disabled:opacity-20 transition border border-slate-700"
-                >
-                  ← Etapa Anterior
-                </button>
-
-                <button
-                  onClick={() => setCurrentStep((prev) => Math.min(6, prev + 1))}
-                  disabled={currentStep === 6}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r ${activeTheme.btnGradient} ${activeTheme.btnText} font-black text-xs transition shadow-md hover:opacity-95 disabled:opacity-20`}
-                >
-                  <span>Siguiente Etapa</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </footer>
-            )}
-
-          </div>
+          <LessonRunner
+            lesson={activeLesson}
+            starredPhrases={starredPhrases}
+            onClose={() => setActiveLesson(null)}
+            onComplete={(action) => {
+              completeLessonAndUnlockNext();
+              if (action === 'immersion') {
+                setCurrentView('IMMERSION');
+              }
+            }}
+            onToggleStarPhrase={handleToggleStarPhrase}
+          />
         )}
       </AnimatePresence>
 
       {/* Modal de Perfil de Usuario Completo */}
+      <DailyVocabularyModal
+        isOpen={isDailyVocabOpen}
+        onClose={() => setIsDailyVocabOpen(false)}
+        userLevel={userHighestLevel}
+        userId={user?.id}
+        onXpAwarded={(amount) => {
+          const next = userXp + amount;
+          setUserXp(next);
+          AppStorage.saveXp(next);
+        }}
+      />
+
       <UserProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}

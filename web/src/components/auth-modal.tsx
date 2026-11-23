@@ -66,13 +66,16 @@ export function AuthModal({
     if (!client || !isSupabaseConfigured) {
       setTimeout(() => {
         setIsLoading(false);
+        // Usuario nuevo: reiniciar progreso a cero estricto
+        AppStorage.resetProgressForNewUser();
+
         const demoProfile: DatabaseProfile = {
           id: 'usr_local_demo',
           email: email || 'estudiante@nativa.edu',
-          name: fullName || (email ? email.split('@')[0] : 'Estudiante Nativa'),
+          name: fullName.trim() || 'Aventurero',
           current_level: 'A1',
-          xp: AppStorage.getXp(),
-          streak: AppStorage.getStreak(),
+          xp: 0,
+          streak: 0,
           is_premium: false
         };
 
@@ -106,6 +109,9 @@ export function AuthModal({
         if (onAuthSuccess) onAuthSuccess(demoProfile);
         setTimeout(() => {
           onClose();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/dashboard';
+          }
         }, 1000);
       }, 700);
       return;
@@ -118,7 +124,7 @@ export function AuthModal({
           password: password.trim(),
           options: {
             data: {
-              full_name: fullName.trim() || cleanUsername,
+              full_name: fullName.trim() || 'Aventurero',
               username: cleanUsername,
               country: country.trim(),
               city: city.trim(),
@@ -140,13 +146,16 @@ export function AuthModal({
 
         // Si Supabase devuelve sesión activa (sin requerir confirmación por email)
         if (data.session && data.user) {
+          // Usuario nuevo: reiniciar progreso a cero estricto
+          AppStorage.resetProgressForNewUser();
+
           const profile: DatabaseProfile = {
             id: data.user.id,
             email: data.user.email || email.trim(),
-            name: fullName.trim() || cleanUsername,
+            name: fullName.trim() || 'Aventurero',
             current_level: 'A1',
-            xp: 140,
-            streak: 1,
+            xp: 0,
+            streak: 0,
             is_premium: false
           };
 
@@ -178,18 +187,18 @@ export function AuthModal({
               email: profile.email,
               name: profile.name,
               current_level: profile.current_level,
-              xp: profile.xp,
-              streak: profile.streak,
+              xp: 0,
+              streak: 0,
               is_premium: profile.is_premium,
               updated_at: new Date().toISOString()
             });
 
             await client.from('user_progress').upsert({
               user_id: profile.id,
-              completed_nodes: ['a1-lesson-1'],
+              completed_nodes: [],
               completed_subnodes: [],
-              immersion_minutes: 15,
-              skills: { listening: 65, speaking: 45, reading: 70, writing: 50 },
+              immersion_minutes: 0,
+              skills: { listening: 0, speaking: 0, reading: 0, writing: 0 },
               updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
           } catch (dbErr) {
@@ -200,7 +209,12 @@ export function AuthModal({
           setSuccessMessage('✓ ¡Cuenta creada e iniciada exitosamente!');
           try { localStorage.setItem('nativa_should_show_placement', 'true'); } catch {}
           if (onAuthSuccess) onAuthSuccess(profile);
-          setTimeout(() => onClose(), 1200);
+          setTimeout(() => {
+            onClose();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/dashboard';
+            }
+          }, 1200);
         } else if (data.user) {
           // Requiere confirmación por email según la config del proyecto Supabase
           soundManager.playVictory();
@@ -234,7 +248,7 @@ export function AuthModal({
             const initialProfile: DatabaseProfile = {
               id: data.user.id,
               email: data.user.email || email.trim(),
-              name: data.user.user_metadata?.full_name || email.split('@')[0],
+              name: data.user.user_metadata?.full_name || 'Aventurero',
               current_level: 'A1',
               xp: 140,
               streak: 1,
@@ -258,10 +272,36 @@ export function AuthModal({
             }
           }
 
+          const isAdminUser = Boolean(profileData.is_admin || profileData.email === 'adohuken2005@gmail.com');
+          try {
+            if (isAdminUser) {
+              document.cookie = 'nativa_admin_session=true; path=/; max-age=604800; SameSite=Lax';
+            } else {
+              document.cookie = 'nativa_admin_session=; path=/; max-age=0';
+            }
+          } catch {}
+
+          // 3. Descargar inmediatamente todo el progreso desde Supabase hacia localStorage (Eliminar Split-Brain)
+          try {
+            await AppStorage.syncFromSupabase(data.user.id);
+            localStorage.setItem('fluentia_user_session', JSON.stringify({
+              id: data.user.id,
+              email: profileData.email || data.user.email || '',
+              role: isAdminUser ? 'ADMIN' : 'STUDENT'
+            }));
+          } catch (syncErr) {
+            console.warn('Advertencia en syncFromSupabase:', syncErr);
+          }
+
           soundManager.playVictory();
           setSuccessMessage(`✓ ¡Bienvenido de nuevo, ${profileData.name}!`);
           if (onAuthSuccess) onAuthSuccess(profileData);
-          setTimeout(() => onClose(), 1000);
+          setTimeout(() => {
+            onClose();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/dashboard';
+            }
+          }, 1000);
         }
       }
     } catch (err: any) {
@@ -394,8 +434,8 @@ export function AuthModal({
           {mode === 'register' && (
             <>
               <div className="space-y-1">
-                <label className="text-[11px] font-mono text-slate-400 uppercase font-bold block">
-                  Nombre Completo:
+                <label className="text-[11px] font-mono text-emerald-400 uppercase font-bold block">
+                  Tu Nombre (Ej. David): *
                 </label>
                 <div className="relative">
                   <input
@@ -403,7 +443,7 @@ export function AuthModal({
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Ej. Bryan Castro"
+                    placeholder="Ej. David"
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500 font-medium"
                   />
                   <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />

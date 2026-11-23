@@ -280,6 +280,52 @@ export class AiConfigService {
   }
 
   /**
+   * Consulta al endpoint proxy del servidor para verificar qué proveedores
+   * tienen llaves configuradas de forma segura en las variables de entorno (.env.local / Dokploy)
+   */
+  public static async getServerConfiguredProviders(): Promise<Record<string, boolean>> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const res = await fetch('/api/ai/proxy', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.configuredProviders || {};
+      }
+    } catch (err) {
+      console.warn('No se pudo consultar el estado del proxy de IA:', err);
+    }
+    return {};
+  }
+
+  /**
+   * Invoca al proxy de IA seguro en el servidor backend
+   */
+  public static async callServerAiProxy(body: {
+    action: string;
+    provider?: string;
+    model?: string;
+    [key: string]: any;
+  }): Promise<{ success: boolean; [key: string]: any }> {
+    try {
+      const res = await fetch('/api/ai/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Error de red al conectar con /api/ai/proxy'
+      };
+    }
+  }
+
+  /**
    * Genera el bloque de variables para el archivo .env.local
    */
   public static exportToEnvFormat(settings: AiSystemSettings): string {

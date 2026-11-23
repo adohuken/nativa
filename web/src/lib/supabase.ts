@@ -46,6 +46,7 @@ export interface DatabaseProfile {
   xp: number;
   streak: number;
   is_premium: boolean;
+  is_admin?: boolean;
   license_code?: string;
   created_at?: string;
   updated_at?: string;

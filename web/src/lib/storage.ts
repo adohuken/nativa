@@ -100,6 +100,7 @@ export interface UserProfile {
   accentPreference: 'uk' | 'us' | 'au';
   preferredStudyTime: 'morning' | 'afternoon' | 'night';
   interfaceLanguage: 'es' | 'en';
+  isAdmin?: boolean;
 }
 
 const DEFAULT_USER_PROFILE: UserProfile = {
@@ -153,7 +154,19 @@ function getLangKey(baseKey: string, lang: string = 'english'): string {
   return `${baseKey}_${lang}`;
 }
 
+let autoSyncDebounceTimer: any = null;
+let isSyncingFromCloud: boolean = false;
+
 export const AppStorage = {
+  triggerAutoSync(): void {
+    if (typeof window === 'undefined' || isSyncingFromCloud) return;
+    if (autoSyncDebounceTimer) clearTimeout(autoSyncDebounceTimer);
+    autoSyncDebounceTimer = setTimeout(() => {
+      this.syncToSupabase().catch((err) => {
+        console.warn('Auto-sync en segundo plano hacia Supabase:', err);
+      });
+    }, 500);
+  },
   getActiveLanguage(): string {
     if (typeof window === 'undefined') return 'english';
     try {
@@ -170,72 +183,104 @@ export const AppStorage = {
   },
 
   getCompletedNodes(lang: string = 'english'): string[] {
-    const defaultNode = lang === 'english' ? 'a1-lesson-1' : `${lang}-a1-lesson-1`;
-    if (typeof window === 'undefined') return [defaultNode];
+    if (typeof window === 'undefined') return [];
     try {
       const data = localStorage.getItem(getLangKey(KEYS.COMPLETED_NODES, lang));
       if (data) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return [defaultNode];
+    return [];
+  },
+
+  resetProgressForNewUser(lang: string = 'english'): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(getLangKey(KEYS.COMPLETED_NODES, lang), JSON.stringify([]));
+      localStorage.setItem(getLangKey(KEYS.COMPLETED_SUBNODES, lang), JSON.stringify([]));
+      localStorage.setItem(getLangKey(KEYS.USER_XP, lang), '0');
+      localStorage.setItem(getLangKey(KEYS.STREAK_DAYS, lang), '0');
+      localStorage.setItem(getLangKey(KEYS.IMMERSION_MINUTES, lang), '0');
+      localStorage.setItem(getLangKey(KEYS.SKILLS, lang), JSON.stringify({ listening: 0, speaking: 0, reading: 0, writing: 0 }));
+    } catch {}
   },
 
   saveCompletedNodes(nodes: string[], lang: string = 'english'): void {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(getLangKey(KEYS.COMPLETED_NODES, lang), JSON.stringify(nodes));
+      this.triggerAutoSync();
     } catch {}
   },
 
+  completeNode(nodeId: string, lang: string = 'english'): string[] {
+    const current = this.getCompletedNodes(lang);
+    if (!current.includes(nodeId)) {
+      const next = [...current, nodeId];
+      this.saveCompletedNodes(next, lang);
+      return next;
+    }
+    return current;
+  },
+
   getXp(lang: string = 'english'): number {
-    if (typeof window === 'undefined') return 140;
+    if (typeof window === 'undefined') return 0;
     try {
       const data = localStorage.getItem(getLangKey(KEYS.USER_XP, lang));
-      if (data !== null) return parseInt(data, 10) || 140;
+      if (data !== null) return parseInt(data, 10) || 0;
     } catch {}
-    return 140;
+    return 0;
   },
 
   saveXp(xp: number, lang: string = 'english'): void {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(getLangKey(KEYS.USER_XP, lang), xp.toString());
+      this.triggerAutoSync();
     } catch {}
   },
 
+  addXp(amount: number, lang: string = 'english'): number {
+    const current = this.getXp(lang);
+    const next = current + Math.max(0, amount);
+    this.saveXp(next, lang);
+    return next;
+  },
+
   getStreak(lang: string = 'english'): number {
-    if (typeof window === 'undefined') return 2;
+    if (typeof window === 'undefined') return 0;
     try {
       const data = localStorage.getItem(getLangKey(KEYS.STREAK_DAYS, lang));
-      if (data !== null) return parseInt(data, 10) || 2;
+      if (data !== null) return parseInt(data, 10) || 0;
     } catch {}
-    return 2;
+    return 0;
   },
 
   saveStreak(days: number, lang: string = 'english'): void {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(getLangKey(KEYS.STREAK_DAYS, lang), days.toString());
+      this.triggerAutoSync();
     } catch {}
   },
 
   getSkillScores(lang: string = 'english'): SkillMasteryScores {
     if (typeof window === 'undefined') {
-      return { listening: 65, speaking: 45, reading: 70, writing: 50 };
+      return { listening: 0, speaking: 0, reading: 0, writing: 0 };
     }
     try {
       const data = localStorage.getItem(getLangKey(KEYS.SKILLS, lang));
       if (data) return JSON.parse(data);
     } catch {}
-    return { listening: 65, speaking: 45, reading: 70, writing: 50 };
+    return { listening: 0, speaking: 0, reading: 0, writing: 0 };
   },
 
   saveSkillScores(scores: SkillMasteryScores, lang: string = 'english'): void {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(getLangKey(KEYS.SKILLS, lang), JSON.stringify(scores));
+      this.triggerAutoSync();
     } catch {}
   },
 
@@ -333,23 +378,24 @@ export const AppStorage = {
 
   // Tiempo de Inmersión Comprensible Acumulado (Minutos)
   getImmersionMinutes(lang: string = 'english'): number {
-    if (typeof window === 'undefined') return 15;
+    if (typeof window === 'undefined') return 0;
     try {
       const data = localStorage.getItem(getLangKey(KEYS.IMMERSION_MINUTES, lang));
-      if (data !== null) return parseInt(data, 10) || 15;
+      if (data !== null) return parseInt(data, 10) || 0;
     } catch {}
-    return 15;
+    return 0;
   },
 
   addImmersionMinutes(mins: number, lang: string = 'english'): number {
-    if (typeof window === 'undefined') return 15;
+    if (typeof window === 'undefined') return 0;
     try {
       const current = this.getImmersionMinutes(lang);
       const next = current + Math.max(1, mins);
       localStorage.setItem(getLangKey(KEYS.IMMERSION_MINUTES, lang), next.toString());
+      this.triggerAutoSync();
       return next;
     } catch {
-      return 15;
+      return 0;
     }
   },
 
@@ -370,6 +416,7 @@ export const AppStorage = {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(getLangKey(KEYS.COMPLETED_SUBNODES, lang), JSON.stringify(subNodes));
+      this.triggerAutoSync();
     } catch {}
   },
 
@@ -446,8 +493,14 @@ export const AppStorage = {
       const data = localStorage.getItem(KEYS.USER_PROFILE);
       if (data) {
         const parsed = JSON.parse(data);
-        // Purgar datos de demostración previos si existían en localStorage
-        if (parsed.username === 'davida' && parsed.email === 'david@nativa.edu') {
+        // Purgar datos de demostración previos o perfiles locales no autenticados
+        if (
+          parsed.username === 'davida' ||
+          parsed.email === 'david@nativa.edu' ||
+          parsed.name === 'David Abarca' ||
+          !parsed.id
+        ) {
+          localStorage.removeItem(KEYS.USER_PROFILE);
           return DEFAULT_USER_PROFILE;
         }
         return { ...DEFAULT_USER_PROFILE, ...parsed };
@@ -665,16 +718,18 @@ export const AppStorage = {
       const client = getSupabaseClient();
       if (!client || !isSupabaseConfigured) return false;
 
+      isSyncingFromCloud = true;
+
       // 1. Cargar Perfil
       const { data: profile } = await client
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (profile) {
-        if (profile.xp !== undefined) this.saveXp(profile.xp);
-        if (profile.streak !== undefined) this.saveStreak(profile.streak);
+        if (profile.xp !== undefined && profile.xp !== null) this.saveXp(profile.xp);
+        if (profile.streak !== undefined && profile.streak !== null) this.saveStreak(profile.streak);
         if (profile.is_premium !== undefined) this.setUserPremium(Boolean(profile.is_premium));
         const currentProfile = this.getUserProfile();
         this.saveUserProfile({
@@ -683,7 +738,8 @@ export const AppStorage = {
           email: profile.email || currentProfile.email,
           name: profile.name || currentProfile.name,
           targetLevel: profile.current_level || currentProfile.targetLevel,
-          avatarUrl: profile.avatar_url || undefined
+          avatarUrl: profile.avatar_url || undefined,
+          isAdmin: Boolean(profile.is_admin || profile.email === 'adohuken2005@gmail.com')
         });
       }
 
@@ -692,16 +748,16 @@ export const AppStorage = {
         .from('user_progress')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (progress) {
-        if (Array.isArray(progress.completed_nodes)) {
+        if (Array.isArray(progress.completed_nodes) && progress.completed_nodes.length > 0) {
           this.saveCompletedNodes(progress.completed_nodes);
         }
         if (Array.isArray(progress.completed_subnodes)) {
           this.saveCompletedSubNodes(progress.completed_subnodes);
         }
-        if (progress.immersion_minutes !== undefined) {
+        if (progress.immersion_minutes !== undefined && progress.immersion_minutes !== null) {
           localStorage.setItem(KEYS.IMMERSION_MINUTES, progress.immersion_minutes.toString());
         }
         if (progress.skills) {
@@ -713,15 +769,25 @@ export const AppStorage = {
     } catch (err) {
       console.error('Error syncing from Supabase:', err);
       return false;
+    } finally {
+      isSyncingFromCloud = false;
     }
   },
 
-  async syncToSupabase(userId: string): Promise<boolean> {
+  async syncToSupabase(explicitUserId?: string): Promise<boolean> {
     if (typeof window === 'undefined') return false;
     try {
       const { getSupabaseClient, isSupabaseConfigured } = await import('@/lib/supabase');
       const client = getSupabaseClient();
       if (!client || !isSupabaseConfigured) return false;
+
+      let userId = explicitUserId;
+      if (!userId) {
+        const { data: { session } } = await client.auth.getSession();
+        userId = session?.user?.id || this.getUserProfile().id;
+      }
+
+      if (!userId) return false;
 
       const profile = this.getUserProfile();
       const xp = this.getXp();
@@ -731,18 +797,51 @@ export const AppStorage = {
       const immersionMinutes = this.getImmersionMinutes();
       const skills = this.getSkillScores();
 
-      // Upsert perfil
+      // =====================================================================
+      // VALIDACIÓN DE SEGURIDAD EN EL SERVIDOR: CADENA DE PRERREQUISITOS
+      // =====================================================================
+      try {
+        const res = await fetch('/api/progress/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            completedNodes,
+            completedSubNodes,
+            xp,
+            streak,
+            immersionMinutes,
+            skills,
+            userProfile: profile
+          })
+        });
+
+        if (res.ok) {
+          const syncData = await res.json();
+          if (syncData.success && syncData.tamperingDetected) {
+            // El servidor detectó y purgó saltos de nivel ilegales
+            this.saveCompletedNodes(syncData.validatedNodes);
+            this.saveXp(syncData.sanitizedXp);
+          }
+          return true;
+        }
+      } catch (apiErr) {
+        console.warn('API /api/progress/sync no disponible, aplicando fallback directo:', apiErr);
+      }
+
+      // Upsert perfil (Fallback)
       await client.from('profiles').upsert({
         id: userId,
-        email: profile.email,
+        email: profile.email || undefined,
         name: profile.name,
         xp,
         streak,
+        current_level: profile.targetLevel?.split(' ')[0] || 'A1',
         is_premium: this.isUserPremium(),
         updated_at: new Date().toISOString()
       });
 
-      // Upsert progreso
+      // Upsert progreso (Fallback)
       await client.from('user_progress').upsert({
         user_id: userId,
         completed_nodes: completedNodes,

@@ -17,12 +17,26 @@ export default function AuthCallbackPage() {
           const { data: { session } } = await client.auth.getSession();
           if (session?.user) {
             await AppStorage.syncFromSupabase(session.user.id);
+
+            const userEmail = session.user.email?.toLowerCase().trim();
+            const { data: profile } = await client
+              .from('profiles')
+              .select('is_admin, email')
+              .eq('id', session.user.id)
+              .maybeSingle();
+
+            const isAdmin = Boolean(profile?.is_admin || userEmail === 'adohuken2005@gmail.com');
+            if (isAdmin) {
+              document.cookie = 'nativa_admin_session=true; path=/; max-age=604800; SameSite=Lax';
+            } else {
+              document.cookie = 'nativa_admin_session=; path=/; max-age=0';
+            }
           }
         }
       } catch (err) {
         console.error('Error handling auth callback:', err);
       } finally {
-        router.replace('/learn/english');
+        router.replace('/dashboard');
       }
     };
     processAuth();

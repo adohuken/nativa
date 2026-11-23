@@ -59,9 +59,24 @@ Provide overallScore (sum of 4 criteria, 0-100) and EXACTLY 3 specific, actionab
     let evaluationResult: any = null;
     let providerUsed = 'fallback';
 
-    // 1. Intentar llamar al proveedor de IA proporcionado
-    if (apiKey && apiKey.trim().length > 5) {
-      const cleanKey = apiKey.trim();
+    // Determinar la llave a usar (priorizar variables de entorno del servidor)
+    const effectiveProvider = (aiProvider || (process.env.GROQ_API_KEY ? 'groq' : process.env.GEMINI_API_KEY ? 'gemini' : 'groq')).toLowerCase();
+    let cleanKey = (typeof apiKey === 'string') ? apiKey.trim() : '';
+
+    if (effectiveProvider === 'groq' && process.env.GROQ_API_KEY) {
+      cleanKey = process.env.GROQ_API_KEY.trim();
+    } else if (effectiveProvider === 'gemini' && process.env.GEMINI_API_KEY) {
+      cleanKey = process.env.GEMINI_API_KEY.trim();
+    } else if (effectiveProvider === 'openrouter' && process.env.OPENROUTER_API_KEY) {
+      cleanKey = process.env.OPENROUTER_API_KEY.trim();
+    } else if (effectiveProvider === 'cerebras' && process.env.CEREBRAS_API_KEY) {
+      cleanKey = process.env.CEREBRAS_API_KEY.trim();
+    } else if (effectiveProvider === 'openai' && process.env.OPENAI_API_KEY) {
+      cleanKey = process.env.OPENAI_API_KEY.trim();
+    }
+
+    // 1. Intentar llamar al proveedor de IA
+    if (cleanKey && cleanKey.length > 5) {
 
       // GROQ CLOUD
       if (aiProvider === 'groq') {

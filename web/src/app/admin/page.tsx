@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3,
@@ -94,8 +95,58 @@ import {
 type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS' | 'AI_LIBRARY' | 'API_KEYS' | 'GLOBAL_CONFIG';
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
+  const [isAdminAuthorized, setIsAdminAuthorized] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<AdminTab>('CONTENT');
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
+
+  // Guardia de Seguridad: Verificación estricta de credenciales de Administrador
+  useEffect(() => {
+    async function verifyAdminAccess() {
+      try {
+        const client = getSupabaseClient();
+        if (!client || !isSupabaseConfigured) {
+          setIsAdminAuthorized(true);
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        const { data: { session } } = await client.auth.getSession();
+        if (!session?.user) {
+          try { document.cookie = 'nativa_admin_session=; path=/; max-age=0'; } catch { }
+          router.replace('/?error=unauthorized_admin');
+          return;
+        }
+
+        const userEmail = session.user.email?.toLowerCase().trim();
+        const { data: profile } = await client
+          .from('profiles')
+          .select('is_admin, email')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        const isSuperAdmin = userEmail === 'adohuken2005@gmail.com';
+        const hasAdminRole = Boolean(profile?.is_admin || isSuperAdmin);
+
+        if (!hasAdminRole) {
+          try { document.cookie = 'nativa_admin_session=; path=/; max-age=0'; } catch { }
+          router.replace('/?error=unauthorized_admin');
+          return;
+        }
+
+        try { document.cookie = 'nativa_admin_session=true; path=/; max-age=604800; SameSite=Lax'; } catch { }
+        setIsAdminAuthorized(true);
+      } catch (err) {
+        console.error('Error al verificar autorización de admin:', err);
+        router.replace('/?error=unauthorized_admin');
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    }
+
+    verifyAdminAccess();
+  }, [router]);
 
   // =========================================================================
   // FASE 5: CONFIGURACIÓN GLOBAL, PAYWALL, SOLICITUDES Y CÓDIGOS B2B
@@ -132,7 +183,7 @@ export default function AdminDashboardPage() {
             return;
           }
         }
-      } catch {}
+      } catch { }
       const profile = AppStorage.getUserProfile();
       setTotalUsersCount(profile.email ? 1 : 0);
     }
@@ -1061,6 +1112,19 @@ export default function AdminDashboardPage() {
     setTimeout(() => setSaveSuccessNotice(null), 3500);
   };
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#070b14] text-white flex flex-col items-center justify-center space-y-4 font-sans">
+        <div className="w-10 h-10 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        <p className="font-mono text-sm text-slate-300">Verificando credenciales de Administrador en Nativa...</p>
+      </div>
+    );
+  }
+
+  if (!isAdminAuthorized) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-[#050811] text-slate-100 flex flex-col md:flex-row selection:bg-emerald-500/30 selection:text-emerald-300">
 
@@ -1131,10 +1195,10 @@ export default function AdminDashboardPage() {
           </button>
 
           <button
-            onClick={() => { 
-              setActiveTab('AI_LIBRARY'); 
+            onClick={() => {
+              setActiveTab('AI_LIBRARY');
               refreshLakeStories();
-              soundManager.playClick(); 
+              soundManager.playClick();
             }}
             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left ${activeTab === 'AI_LIBRARY'
               ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border border-emerald-500/40 text-emerald-300 shadow-sm'
@@ -1146,9 +1210,9 @@ export default function AdminDashboardPage() {
           </button>
 
           <button
-            onClick={() => { 
-              setActiveTab('API_KEYS'); 
-              soundManager.playClick(); 
+            onClick={() => {
+              setActiveTab('API_KEYS');
+              soundManager.playClick();
             }}
             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left ${activeTab === 'API_KEYS'
               ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border border-emerald-500/40 text-emerald-300 shadow-sm'
@@ -1160,9 +1224,9 @@ export default function AdminDashboardPage() {
           </button>
 
           <button
-            onClick={() => { 
-              setActiveTab('GLOBAL_CONFIG'); 
-              soundManager.playClick(); 
+            onClick={() => {
+              setActiveTab('GLOBAL_CONFIG');
+              soundManager.playClick();
             }}
             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left ${activeTab === 'GLOBAL_CONFIG'
               ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/10 border border-amber-500/40 text-amber-300 shadow-sm'
@@ -1234,11 +1298,10 @@ export default function AdminDashboardPage() {
                       setCourseType('general');
                       soundManager.playClick();
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                      courseType === 'general'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-md font-black'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${courseType === 'general'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     <GraduationCap className="w-3.5 h-3.5" />
                     <span>Idioma General (A1-C2)</span>
@@ -1249,11 +1312,10 @@ export default function AdminDashboardPage() {
                       setCourseType('specialized');
                       soundManager.playClick();
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                      courseType === 'specialized'
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-400 text-slate-950 shadow-md font-black'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${courseType === 'specialized'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-400 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     <Headphones className="w-3.5 h-3.5" />
                     <span>Curso Especializado</span>
@@ -2154,11 +2216,10 @@ export default function AdminDashboardPage() {
                     <button
                       key={lvl}
                       onClick={() => setStoryFilterLevel(lvl)}
-                      className={`px-2 py-0.5 rounded-lg font-bold transition ${
-                        storyFilterLevel === lvl
-                          ? 'bg-emerald-500 text-slate-950'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition ${storyFilterLevel === lvl
+                        ? 'bg-emerald-500 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       {lvl === 'ALL' ? 'Todos' : lvl}
                     </button>
@@ -2235,11 +2296,10 @@ export default function AdminDashboardPage() {
                               </span>
                             </div>
 
-                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-                              story.status === 'approved'
-                                ? 'bg-emerald-950/80 border border-emerald-500/40 text-emerald-300'
-                                : 'bg-rose-950/80 border border-rose-500/40 text-rose-300'
-                            }`}>
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${story.status === 'approved'
+                              ? 'bg-emerald-950/80 border border-emerald-500/40 text-emerald-300'
+                              : 'bg-rose-950/80 border border-rose-500/40 text-rose-300'
+                              }`}>
                               {story.status === 'approved' ? '✓ Aprobada' : '✕ Oculta'}
                             </span>
                           </div>
@@ -2550,8 +2610,8 @@ export default function AdminDashboardPage() {
                     {testResults.openrouter?.quotaInfo?.remainingCredits
                       ? `OpenRouter: ${testResults.openrouter.quotaInfo.remainingCredits}`
                       : testResults.elevenlabs?.quotaInfo?.remainingCredits
-                      ? `ElevenLabs: ${testResults.elevenlabs.quotaInfo.remainingCredits}`
-                      : 'Listo para diagnosticar'}
+                        ? `ElevenLabs: ${testResults.elevenlabs.quotaInfo.remainingCredits}`
+                        : 'Listo para diagnosticar'}
                   </div>
                   <div className="text-[10px] font-mono text-purple-400 truncate">
                     {testResults.elevenlabs?.quotaInfo?.usage
@@ -2763,11 +2823,10 @@ export default function AdminDashboardPage() {
                             type="button"
                             disabled={isTesting}
                             onClick={() => handleTestProvider(providerKey)}
-                            className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                              isConfigured
-                                ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
-                                : 'bg-slate-900 text-slate-500 border border-slate-800'
-                            } disabled:opacity-50`}
+                            className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${isConfigured
+                              ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                              : 'bg-slate-900 text-slate-500 border border-slate-800'
+                              } disabled:opacity-50`}
                           >
                             <RotateCcw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin text-amber-400' : ''}`} />
                             <span>{isTesting ? 'Probando...' : 'Probar'}</span>
@@ -2777,11 +2836,10 @@ export default function AdminDashboardPage() {
 
                       {/* DIAGNÓSTICO ENRIQUECIDO (TOKENS, TIER, LÍMITES Y SALDO) */}
                       {testResult && (
-                        <div className={`p-3.5 rounded-xl border text-xs space-y-2 animate-in fade-in ${
-                          testResult.success
-                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-                            : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
-                        }`}>
+                        <div className={`p-3.5 rounded-xl border text-xs space-y-2 animate-in fade-in ${testResult.success
+                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                          : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                          }`}>
                           <div className="flex items-center justify-between gap-3">
                             <span className="font-bold flex items-center gap-1.5">
                               {testResult.message}
@@ -2927,7 +2985,7 @@ export default function AdminDashboardPage() {
 
           return (
             <div className="p-6 md:p-8 space-y-8">
-              
+
               {/* Cabecera de Configuración Global */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -2966,11 +3024,10 @@ export default function AdminDashboardPage() {
 
                   <button
                     onClick={handleTogglePaywall}
-                    className={`px-5 py-3 rounded-2xl font-black text-xs transition flex items-center gap-3 cursor-pointer shrink-0 shadow-lg ${
-                      paywallEnabled
-                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/25 ring-2 ring-amber-300'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                    }`}
+                    className={`px-5 py-3 rounded-2xl font-black text-xs transition flex items-center gap-3 cursor-pointer shrink-0 shadow-lg ${paywallEnabled
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/25 ring-2 ring-amber-300'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      }`}
                   >
                     {paywallEnabled ? (
                       <>
@@ -3058,13 +3115,12 @@ export default function AdminDashboardPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-bold text-white">{req.userName}</span>
                             <span className="text-[11px] text-slate-400 font-mono">({req.userEmail || req.userId})</span>
-                            <span className={`text-[10px] font-mono uppercase font-black px-2 py-0.5 rounded-full border ${
-                              req.status === 'approved'
-                                ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'
-                                : req.status === 'rejected'
+                            <span className={`text-[10px] font-mono uppercase font-black px-2 py-0.5 rounded-full border ${req.status === 'approved'
+                              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'
+                              : req.status === 'rejected'
                                 ? 'bg-rose-950/80 border-rose-500/40 text-rose-300'
                                 : 'bg-amber-950/80 border-amber-500/40 text-amber-300 animate-pulse'
-                            }`}>
+                              }`}>
                               {req.status === 'approved' ? '✓ Aprobado' : req.status === 'rejected' ? 'Rechazado' : 'Pendiente de Revisión'}
                             </span>
                           </div>
@@ -3247,11 +3303,10 @@ export default function AdminDashboardPage() {
                             </Link>
                             <button
                               onClick={() => handleToggleLicense(lic.code)}
-                              className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition ${
-                                lic.active 
-                                  ? 'text-amber-400 hover:bg-amber-950/40' 
-                                  : 'text-emerald-400 hover:bg-emerald-950/40'
-                              }`}
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition ${lic.active
+                                ? 'text-amber-400 hover:bg-amber-950/40'
+                                : 'text-emerald-400 hover:bg-emerald-950/40'
+                                }`}
                             >
                               {lic.active ? 'Desactivar' : 'Reactivar'}
                             </button>
@@ -3310,11 +3365,10 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setNewCourseType('general')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
-                    newCourseType === 'general'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-black shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${newCourseType === 'general'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-black shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                    }`}
                 >
                   <GraduationCap className="w-4 h-4" />
                   <span>Idioma General (A1-C2)</span>
@@ -3323,11 +3377,10 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setNewCourseType('specialized')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
-                    newCourseType === 'specialized'
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-400 text-slate-950 font-black shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${newCourseType === 'specialized'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-400 text-slate-950 font-black shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                    }`}
                 >
                   <Headphones className="w-4 h-4" />
                   <span>Especializado (4 Módulos)</span>

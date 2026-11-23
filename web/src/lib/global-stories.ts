@@ -340,7 +340,7 @@ export class GlobalStoriesService {
     // Filtrar por búsqueda de texto
     if (searchTerm && searchTerm.trim().length > 0) {
       const q = searchTerm.toLowerCase().trim();
-      candidates = candidates.filter(s => 
+      candidates = candidates.filter(s =>
         s.title.toLowerCase().includes(q) ||
         s.topic.toLowerCase().includes(q) ||
         s.content.toLowerCase().includes(q)
@@ -421,7 +421,7 @@ export class GlobalStoriesService {
 
     const timestamp = Date.now();
     const id = `global-story-${storyData.level.toLowerCase()}-${storyData.topic.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${timestamp}`;
-    
+
     const paragraphs = storyData.paragraphs && storyData.paragraphs.length > 0
       ? storyData.paragraphs
       : storyData.content.split('\n\n').filter(p => p.trim().length > 0);
@@ -451,6 +451,33 @@ export class GlobalStoriesService {
 
     this.rebuildIndexes(currentList);
     this.persistToDisk(currentList);
+
+    // Sincronización asíncrona hacia Supabase (tabla global_stories)
+    if (typeof window !== 'undefined') {
+      import('@/lib/supabase').then(({ getSupabaseClient, isSupabaseConfigured }) => {
+        const client = getSupabaseClient();
+        if (client && isSupabaseConfigured) {
+          Promise.resolve(client.from('global_stories').upsert({
+            id: newStory.id,
+            level: newStory.level,
+            topic: newStory.topic,
+            title: newStory.title,
+            subtitle: newStory.subtitle,
+            content: newStory.content,
+            paragraphs: newStory.paragraphs,
+            word_count: newStory.word_count,
+            times_read: newStory.times_read,
+            status: newStory.status,
+            vocabulary: newStory.vocabulary,
+            cultural_insight: newStory.cultural_insight,
+            reading_minutes: newStory.reading_minutes,
+            created_at: newStory.created_at
+          }, { onConflict: 'id' })).then(({ error }: any) => {
+            if (error) console.warn('[Supabase] Error al sincronizar global_story:', error);
+          }).catch((err: any) => console.warn('[Supabase] Exception al sincronizar global_story:', err));
+        }
+      });
+    }
 
     return newStory;
   }
@@ -502,8 +529,47 @@ export class GlobalStoriesService {
       return { story: cached, isFromCache: true };
     }
 
-    // 2. Si no hay resultados, generar con el rotador de IAs
-    await new Promise(resolve => setTimeout(resolve, 900)); // Latencia realista de inferencia
+    // 2. Si no hay en caché, intentar generar a través del Proxy de IA seguro en el servidor
+    try {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/ai/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'generate_story',
+            level,
+            topic,
+            contextHint
+          }),
+          signal: AbortSignal.timeout(12000)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.story) {
+            const serverStory = data.story;
+            const saved = this.saveStory({
+              level,
+              topic,
+              title: serverStory.title || `${topic} Scenario`,
+              subtitle: serverStory.subtitle,
+              content: Array.isArray(serverStory.paragraphs) ? serverStory.paragraphs.join('\n\n') : (serverStory.content || ''),
+              paragraphs: Array.isArray(serverStory.paragraphs) ? serverStory.paragraphs : undefined,
+              vocabulary: serverStory.vocabulary,
+              cultural_insight: serverStory.cultural_insight,
+              reading_minutes: serverStory.reading_minutes,
+              status: 'approved'
+            });
+            return { story: saved, isFromCache: false };
+          }
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('Proxy de IA no disponible o timeout, recurriendo a motor local:', proxyErr);
+    }
+
+    // 3. Respaldo pedagógico local con latencia realista
+    await new Promise(resolve => setTimeout(resolve, 600));
 
     const generated = this.synthesizeAiStory(level, topic, contextHint);
     const saved = this.saveStory({
@@ -610,7 +676,7 @@ export class GlobalStoriesService {
     const all = Array.from(this.storiesMap.values());
     const totalStories = all.length;
     const totalReads = all.reduce((acc, s) => acc + (s.times_read || 0), 0);
-    
+
     // Cada lectura que reutiliza una historia ahorra ~600 tokens de generación de IA
     const estimatedTokensSaved = Math.max(0, (totalReads - totalStories) * 650);
 

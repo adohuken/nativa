@@ -65,12 +65,61 @@ function CompanyDashboardContent() {
   const rawCode = (params?.code as string) || '';
   const licenseCode = decodeURIComponent(rawCode).toUpperCase();
 
+  const [isAdminAuthorized, setIsAdminAuthorized] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [license, setLicense] = useState<LicenseCode | null>(null);
   const [students, setStudents] = useState<CompanyStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [levelFilter, setLevelFilter] = useState('ALL');
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Guardia de Seguridad: Verificación estricta de credenciales de Administrador
+  useEffect(() => {
+    async function verifyAdminAccess() {
+      try {
+        const client = getSupabaseClient();
+        if (!client || !isSupabaseConfigured) {
+          setIsAdminAuthorized(true);
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        const { data: { session } } = await client.auth.getSession();
+        if (!session?.user) {
+          try { document.cookie = 'nativa_admin_session=; path=/; max-age=0'; } catch {}
+          router.replace('/?error=unauthorized_admin');
+          return;
+        }
+
+        const userEmail = session.user.email?.toLowerCase().trim();
+        const { data: profile } = await client
+          .from('profiles')
+          .select('is_admin, email')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        const isSuperAdmin = userEmail === 'adohuken2005@gmail.com';
+        const hasAdminRole = Boolean(profile?.is_admin || isSuperAdmin);
+
+        if (!hasAdminRole) {
+          try { document.cookie = 'nativa_admin_session=; path=/; max-age=0'; } catch {}
+          router.replace('/?error=unauthorized_admin');
+          return;
+        }
+
+        try { document.cookie = 'nativa_admin_session=true; path=/; max-age=604800; SameSite=Lax'; } catch {}
+        setIsAdminAuthorized(true);
+      } catch (err) {
+        console.error('Error al verificar autorización de admin:', err);
+        router.replace('/?error=unauthorized_admin');
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    }
+
+    verifyAdminAccess();
+  }, [router]);
 
   useEffect(() => {
     async function loadRealData() {
@@ -169,6 +218,19 @@ function CompanyDashboardContent() {
     ? Math.round(students.reduce((acc, s) => acc + s.tbltAverageScore, 0) / totalStudentsCount)
     : 0;
   const totalImmersionHours = students.reduce((acc, s) => acc + s.immersionHours, 0);
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#070b14] text-white flex flex-col items-center justify-center space-y-4 font-sans">
+        <div className="w-10 h-10 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+        <p className="font-mono text-sm text-slate-300">Verificando credenciales de Administrador en Nativa...</p>
+      </div>
+    );
+  }
+
+  if (!isAdminAuthorized) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans p-4 sm:p-8 space-y-8">
