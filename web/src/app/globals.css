@@ -18,18 +18,17 @@ body {
 
 /* Custom Scrollbars elegantes para Modo Oscuro Premium */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #07090e;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #334155;
   border-radius: 9999px;
-  border: 1px solid #334155;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -39,5 +38,5 @@ body {
 /* Soporte para Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1e293b #07090e;
+  scrollbar-color: #334155 transparent;
 }

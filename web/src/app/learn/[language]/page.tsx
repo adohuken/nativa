@@ -33,6 +33,7 @@ import {
   Mail,
   KeyRound,
   AlertCircle,
+  HelpCircle,
   Globe,
   BrainCircuit,
   GraduationCap,
@@ -77,7 +78,7 @@ import { COMPREHENSIVE_CURRICULUM, IntensiveLesson, StoryEvent, NoticingInsight 
 import { COMPLETE_SYLLABUS, DAILY_STUDY_PLAN, UNIVERSITY_PEDAGOGICAL_FRAMEWORK } from '@/lib/syllabus-data';
 import { soundManager } from '@/lib/sound-effects';
 import { speechEvaluator, PronunciationEvaluation } from '@/lib/speech-recognition';
-import { AppStorage, SkillMasteryScores, ProjectSubmission, UserProfile } from '@/lib/storage';
+import { AppStorage, SkillMasteryScores, ProjectSubmission, UserProfile, DailyMissionsState } from '@/lib/storage';
 import { ACADEMIC_PROJECTS, AcademicProjectDefinition, evaluateProjectSubmission } from '@/lib/project-data';
 import { generateSrsDeck, FlashcardItem } from '@/lib/srs-review';
 import { getFigurativePronunciation } from '@/lib/phonetics';
@@ -97,6 +98,7 @@ import { APP_NAME } from '@/lib/config';
 import { getSupabaseClient, isSupabaseConfigured, DatabaseProfile } from '@/lib/supabase';
 import { AiConfigService } from '@/lib/ai-config';
 import { LearningMap, ImmersionViewer, SrsGame, LessonRunner } from '@/components/learn';
+import { OnboardingTour } from '@/components/onboarding-tour';
 
 interface BuilderToken {
   id: string;
@@ -281,6 +283,7 @@ function FluentiaPathContent() {
   const [authLoading, setAuthLoading] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isPlacementTestOpen, setIsPlacementTestOpen] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
   const [paywallReason, setPaywallReason] = useState<string>('');
   const [isCertificatesModalOpen, setIsCertificatesModalOpen] = useState(false);
@@ -290,6 +293,7 @@ function FluentiaPathContent() {
   const [isUserPremium, setIsUserPremium] = useState<boolean>(() => AppStorage.isUserPremium());
   const [isPaywallActive, setIsPaywallActive] = useState<boolean>(() => AppStorage.getPaywallEnabled());
   const [userProfile, setUserProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
+  const [dailyMissionsState, setDailyMissionsState] = useState<DailyMissionsState>(() => AppStorage.getDailyMissions());
 
   // Navegación de Vistas del Dashboard: 'PATH' | 'IMMERSION' | 'SYLLABUS' | 'PROJECTS' | 'REVIEW'
   const [currentView, setCurrentView] = useState<'PATH' | 'IMMERSION' | 'SYLLABUS' | 'PROJECTS' | 'REVIEW'>('PATH');
@@ -420,6 +424,14 @@ function FluentiaPathContent() {
     };
 
     hydrateLocalState();
+
+    // Auto-lanzar Onboarding Tour en la Ruta de Aprendizaje si el usuario aún no lo ha visto
+    if (!AppStorage.hasSeenTour()) {
+      const tourTimer = setTimeout(() => {
+        setIsTourOpen(true);
+      }, 750);
+      return () => clearTimeout(tourTimer);
+    }
 
     // 4. Mostrar Test de Nivelación si acaba de registrarse
     try {
@@ -670,6 +682,25 @@ function FluentiaPathContent() {
     soundManager.playClick();
   };
 
+  const handleTourDismiss = async () => {
+    setIsTourOpen(false);
+    AppStorage.setHasSeenTour(true);
+    const client = getSupabaseClient();
+    if (client && isSupabaseConfigured) {
+      try {
+        const { data: { session } } = await client.auth.getSession();
+        if (session?.user?.id) {
+          await client.from('profiles').update({
+            has_seen_tour: true,
+            updated_at: new Date().toISOString()
+          }).eq('id', session.user.id);
+        }
+      } catch (err) {
+        console.warn('Error guardando has_seen_tour en Supabase:', err);
+      }
+    }
+  };
+
   const handleLogout = async () => {
     try {
       const client = getSupabaseClient();
@@ -904,6 +935,24 @@ function FluentiaPathContent() {
     if (completedNodeIds.some(id => id.startsWith('a2'))) return 'A2';
     return 'A1';
   }, [completedNodeIds]);
+
+  const displayName = useMemo(() => {
+    if (userProfile.name && userProfile.name !== 'Estudiante' && !userProfile.name.includes('@')) {
+      return userProfile.name;
+    }
+    if (userProfile.username && userProfile.username !== 'estudiante' && userProfile.username !== 'davida') {
+      return userProfile.username;
+    }
+    if (userProfile.email && !userProfile.email.includes('@')) {
+      return userProfile.email;
+    }
+    return 'David Abarca';
+  }, [userProfile]);
+
+  const levelSubtitle = useMemo(() => {
+    const rawLevel = userProfile.targetLevel?.split(' ')[0] || userHighestLevel || 'A1';
+    return `Nivel ${rawLevel} • Ruta Universitaria`;
+  }, [userProfile.targetLevel, userHighestLevel]);
 
   const bottleneckSkill = useMemo(() => {
     const list = [
@@ -1551,6 +1600,17 @@ function FluentiaPathContent() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Botón de Ayuda Móvil: Inicia Onboarding Tour */}
+          <button
+            onClick={() => {
+              setIsTourOpen(true);
+              soundManager.playClick();
+            }}
+            title="Ver Tutorial Interactivo (Tour de Bienvenida)"
+            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300 transition"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+          </button>
           <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-xl shadow-xs">
             <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
             <span>{streakDays}d</span>
@@ -1571,7 +1631,7 @@ function FluentiaPathContent() {
       )}
 
       {/* ================= SIDEBAR DE CONTROL (Desktop + Mobile Drawer) ================= */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-72 max-w-[85vw] border-r border-slate-800/80 bg-[#090d16] md:bg-[#090d16]/95 backdrop-blur-2xl flex flex-col shrink-0 p-5 space-y-4 overflow-y-auto transition-transform duration-300 ease-in-out ${isMobileDrawerOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+      <aside className={`fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] h-screen border-r border-slate-800/80 bg-[#090d16] md:bg-[#090d16]/95 backdrop-blur-2xl flex flex-col shrink-0 p-5 space-y-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-transform duration-300 ease-in-out ${isMobileDrawerOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
         }`}>
 
         {/* Brand & Botón Cerrar en Móvil */}
@@ -1587,237 +1647,351 @@ function FluentiaPathContent() {
           </button>
         </div>
 
-        {/* 1. Header Unificado: Perfil + Nivel + Bandera / Idioma + Menú de Cuenta */}
-        <div className="relative" ref={accountMenuRef}>
-          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition shadow-xs">
-            {/* Avatar + Nombre + Nivel */}
-            <button
-              onClick={() => {
-                setIsAccountMenuOpen(!isAccountMenuOpen);
-                soundManager.playClick();
-              }}
-              className="flex items-center gap-2 min-w-0 text-left cursor-pointer flex-1 group"
-              title="Opciones de cuenta y configuración"
-            >
-              <div className="w-7 h-7 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
-                {userProfile.avatarUrl ? (
-                  <img src={userProfile.avatarUrl} alt={userProfile.name} className="w-full h-full object-cover" />
+        {/* 1. Header Unificado: Perfil + Nivel + Bandera / Idioma + Menú de Cuenta + Stats */}
+        <div data-tour="tour-profile-stats" className="space-y-3">
+          <div className="relative" ref={accountMenuRef}>
+            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition shadow-xs">
+              {/* Avatar + Nombre + Nivel */}
+              <div className="flex items-center gap-2.5 min-w-0 text-left flex-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccountMenuOpen(!isAccountMenuOpen);
+                    soundManager.playClick();
+                  }}
+                  className="flex items-center gap-2.5 min-w-0 text-left cursor-pointer flex-1 group"
+                  title="Opciones de cuenta y configuración"
+                >
+                  <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-800 border border-slate-700/80 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner group-hover:border-slate-600 transition">
+                    {userProfile.avatarUrl ? (
+                      <img src={userProfile.avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-sm">{userProfile.avatarEmoji || '👨‍🎓'}</span>
+                    )}
+                  </div>
+                  <div className="overflow-hidden min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white group-hover:text-emerald-300 block truncate transition">
+                        {displayName}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400/90 block truncate">
+                      {levelSubtitle}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Indicador / Botón de Premium */}
+                {isUserPremium ? (
+                  <span title="Nativa Premium Activo" className="inline-flex items-center p-1 rounded-md bg-amber-500/15 border border-amber-500/30">
+                    <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                  </span>
                 ) : (
-                  <span>{userProfile.avatarEmoji || '👨‍🎓'}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaywallReason('Desbloquea los niveles B1 a C2 y todas las funciones PRO.');
+                      setIsPaywallModalOpen(true);
+                      soundManager.playClick();
+                    }}
+                    title="Obtener Nativa Premium (B1-C2)"
+                    className="p-1 rounded-md hover:bg-slate-800 text-amber-400/80 hover:text-amber-300 hover:scale-105 transition shrink-0 cursor-pointer"
+                  >
+                    <Crown className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
-              <div className="overflow-hidden min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-200 group-hover:text-white block truncate transition">
-                    {userProfile.name}
-                  </span>
-                  {isUserPremium ? (
-                    <span title="Nativa Premium Activo" className="inline-flex items-center">
-                      <Crown className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
-                    </span>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPaywallReason('Desbloquea los niveles B1 a C2 y todas las funciones PRO.');
-                        setIsPaywallModalOpen(true);
-                        soundManager.playClick();
-                      }}
-                      title="Obtener Nativa Premium (B1-C2)"
-                      className="text-amber-400/70 hover:text-amber-400 hover:scale-110 transition shrink-0"
-                    >
-                      <Crown className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-                <span className="text-[10px] font-mono text-slate-400 block truncate">
-                  {userHighestLevel} • @{userProfile.username}
-                </span>
-              </div>
-            </button>
 
-            {/* Bandera / Hub + Botón Ajustes */}
-            <div className="flex items-center gap-1 shrink-0 ml-1.5">
-              <Link
-                href="/dashboard"
-                onClick={() => soundManager.playClick()}
-                className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition"
-                title={`Volver a Mi Panel de Estudio (Idioma: ${currentLanguageEntry.name})`}
-              >
-                <span className="text-sm leading-none">{currentLanguageEntry.flag}</span>
-              </Link>
-              <button
-                onClick={() => {
-                  setIsAccountMenuOpen(!isAccountMenuOpen);
-                  soundManager.playClick();
-                }}
-                className={`p-1.5 rounded-lg border transition cursor-pointer ${isAccountMenuOpen ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'}`}
-                title="Menú de Cuenta y Ajustes"
-                aria-expanded={isAccountMenuOpen}
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
+              {/* Botón Ayuda Tour + Bandera / Hub + Botón Ajustes */}
+              <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsTourOpen(true);
+                    soundManager.playClick();
+                  }}
+                  className="p-1.5 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-emerald-300 hover:bg-slate-800 transition cursor-pointer"
+                  title="Ver Tutorial Interactivo (Tour de Bienvenida)"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+                </button>
+                <Link
+                  href="/dashboard"
+                  onClick={() => soundManager.playClick()}
+                  className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                  title={`Volver a Mi Panel de Estudio (Idioma: ${currentLanguageEntry.name})`}
+                >
+                  <span className="text-sm leading-none">{currentLanguageEntry.flag}</span>
+                </Link>
+                <button
+                  onClick={() => {
+                    setIsAccountMenuOpen(!isAccountMenuOpen);
+                    soundManager.playClick();
+                  }}
+                  className={`p-1.5 rounded-lg border transition cursor-pointer ${isAccountMenuOpen ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                  title="Menú de Cuenta y Ajustes"
+                  aria-expanded={isAccountMenuOpen}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 2. Dropdown de Acciones Secundarias (Test Nivelación, Premium, Certificados, Perfil, Salir) */}
+            <AnimatePresence>
+              {isAccountMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-0 right-0 top-full mt-1.5 z-40 p-1.5 bg-[#0c1017] border border-slate-800 rounded-xl shadow-2xl backdrop-blur-xl space-y-0.5"
+                >
+                  <button
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      setIsPlacementTestOpen(true);
+                      soundManager.playClick();
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Test de Nivelación</span>
+                    </div>
+                    <span className="text-[9px] font-mono bg-purple-950/60 border border-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded font-bold">
+                      Adaptativo
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      if (!isUserPremium) {
+                        setPaywallReason('Desbloquea los niveles B1 a C2 y soporte IA avanzado.');
+                      }
+                      setIsPaywallModalOpen(true);
+                      soundManager.playClick();
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{isUserPremium ? 'Suscripción Premium' : 'Obtener Premium'}</span>
+                    </div>
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${isUserPremium ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-950/60 border border-amber-500/30 text-amber-300'}`}>
+                      {isUserPremium ? 'ACTIVO' : 'PRO'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      setIsCertificatesModalOpen(true);
+                      soundManager.playClick();
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Award className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Mis Certificados</span>
+                    </div>
+                    <span className="text-[9px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
+                      PDF
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      setIsProfileModalOpen(true);
+                      soundManager.playClick();
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Mi Perfil</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-slate-400">
+                      Editar
+                    </span>
+                  </button>
+
+                  <Link
+                    href="/dashboard"
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      soundManager.playClick();
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Compass className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Panel de Estudio</span>
+                    </div>
+                    <span className="text-[9px] font-mono bg-teal-950/60 border border-teal-500/30 text-teal-300 px-1.5 py-0.5 rounded font-bold">
+                      Dashboard
+                    </span>
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      soundManager.playClick();
+                      setIsTourOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Tour de Bienvenida</span>
+                    </div>
+                    <span className="text-[9px] font-mono bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
+                      Tutorial
+                    </span>
+                  </button>
+
+                  <div className="h-px bg-slate-800/80 my-1" />
+
+                  <button
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 transition text-left cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Cerrar Sesión</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* 3. Métricas Rápidas: Barra horizontal sobria y minimalista */}
+          <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#090d18] border border-slate-800/80 text-xs font-mono select-none">
+            <div className="flex items-center gap-1.5 text-amber-400" title="Racha de estudio diario">
+              <Flame className="w-3.5 h-3.5 fill-current" />
+              <span className="font-extrabold">{streakDays}d racha</span>
+            </div>
+            <span className="text-slate-800">|</span>
+            <div className="flex items-center gap-1.5 text-emerald-400" title="Puntos de experiencia acumulados">
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span className="font-extrabold">{userXp} XP</span>
+            </div>
+            <span className="text-slate-800">|</span>
+            <div className="flex items-center gap-1.5 text-cyan-400" title="Minutos de inmersión acumulados">
+              <Headphones className="w-3.5 h-3.5" />
+              <span className="font-extrabold">{immersionMinutes}m</span>
             </div>
           </div>
-
-          {/* 2. Dropdown de Acciones Secundarias (Test Nivelación, Premium, Certificados, Perfil, Salir) */}
-          <AnimatePresence>
-            {isAccountMenuOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                transition={{ duration: 0.15 }}
-                className="absolute left-0 right-0 top-full mt-1.5 z-40 p-1.5 bg-[#0c1017] border border-slate-800 rounded-xl shadow-2xl backdrop-blur-xl space-y-0.5"
-              >
-                <button
-                  onClick={() => {
-                    setIsAccountMenuOpen(false);
-                    setIsPlacementTestOpen(true);
-                    soundManager.playClick();
-                  }}
-                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Test de Nivelación</span>
-                  </div>
-                  <span className="text-[9px] font-mono bg-purple-950/60 border border-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded font-bold">
-                    Adaptativo
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsAccountMenuOpen(false);
-                    if (!isUserPremium) {
-                      setPaywallReason('Desbloquea los niveles B1 a C2 y soporte IA avanzado.');
-                    }
-                    setIsPaywallModalOpen(true);
-                    soundManager.playClick();
-                  }}
-                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{isUserPremium ? 'Suscripción Premium' : 'Obtener Premium'}</span>
-                  </div>
-                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${isUserPremium ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-950/60 border border-amber-500/30 text-amber-300'}`}>
-                    {isUserPremium ? 'ACTIVO' : 'PRO'}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsAccountMenuOpen(false);
-                    setIsCertificatesModalOpen(true);
-                    soundManager.playClick();
-                  }}
-                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Award className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Mis Certificados</span>
-                  </div>
-                  <span className="text-[9px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
-                    PDF
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsAccountMenuOpen(false);
-                    setIsProfileModalOpen(true);
-                    soundManager.playClick();
-                  }}
-                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Mi Perfil</span>
-                  </div>
-                  <span className="text-[9px] font-mono text-slate-400">
-                    Editar
-                  </span>
-                </button>
-
-                <div className="h-px bg-slate-800/80 my-1" />
-
-                <button
-                  onClick={() => {
-                    setIsAccountMenuOpen(false);
-                    handleLogout();
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 transition text-left cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Cerrar Sesión</span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
-        {/* 3. Stats Gamer: Barra horizontal limpia y luminosa */}
-        <div className="flex items-center justify-between px-2 py-1 text-xs font-mono select-none">
-          <div className="flex items-center gap-1.5 text-amber-400" title="Racha de estudio diario">
-            <Flame className="w-3.5 h-3.5 fill-current drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]" />
-            <span className="font-extrabold tracking-tight">{streakDays}d</span>
-          </div>
-          <span className="text-slate-700 font-mono text-[11px]">|</span>
-          <div className="flex items-center gap-1.5 text-emerald-400" title="Puntos de experiencia acumulados">
-            <Zap className="w-3.5 h-3.5 fill-current drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
-            <span className="font-extrabold tracking-tight">{userXp} XP</span>
-          </div>
-          <span className="text-slate-700 font-mono text-[11px]">|</span>
-          <div className="flex items-center gap-1.5 text-cyan-400" title="Minutos de inmersión acumulados">
-            <Headphones className="w-3.5 h-3.5 drop-shadow-[0_0_8px_rgba(6,182,212,0.7)]" />
-            <span className="font-extrabold tracking-tight">{immersionMinutes}m</span>
-          </div>
-        </div>
-
-        {/* 4. Misión Diaria Gamer (Elemento llamativo destacado para no perder la racha) */}
-        <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500/10 via-slate-900/90 to-slate-950 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.08)] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black flex items-center gap-1.5">
-              <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]" />
-              Misión Diaria
-            </span>
-            <span className="text-[10px] font-mono font-extrabold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded-full shadow-xs">
-              +30 XP
+        {/* 4. Rutina Diaria Ejecutiva: Objetivos Interactivos Profesionales */}
+        <div data-tour="tour-daily-practice" className="p-3 rounded-2xl bg-[#090e1b] border border-slate-800/90 shadow-sm space-y-2.5">
+          {/* Header con progreso del día */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
+            <div className="flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[11px] font-bold text-slate-200 tracking-tight">
+                Práctica Diaria
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+              {dailyMissionsState.missions.filter(m => m.completed).length}/3 Completados
             </span>
           </div>
 
-          <div className="space-y-0.5">
-            <p className="text-xs text-white font-bold leading-snug">
-              Potencia tu {bottleneckSkill.name.split(' ')[0]}
-            </p>
-            <p className="text-[10px] text-slate-400 leading-relaxed">
-              Consolida tu racha hoy con práctica activa de repaso SRS o voz.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-1.5 pt-0.5">
-            <button
-              onClick={() => {
-                setCurrentView('REVIEW');
-                soundManager.playClick();
+          {/* Micro-barra de progreso sutil */}
+          <div className="w-full h-1 bg-slate-800/80 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 transition-all duration-500 rounded-full"
+              style={{
+                width: `${Math.round((dailyMissionsState.missions.filter(m => m.completed).length / (dailyMissionsState.missions.length || 3)) * 100)}%`
               }}
-              className="flex-1 py-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Iniciar Práctica</span>
-            </button>
-            <button
+            />
+          </div>
+
+          {/* 3 Tareas Diarias Interactivas en formato Fila Limpia */}
+          <div className="space-y-1.5 pt-0.5">
+            {/* Tarea 1: Vocabulario del Día (The Daily Drop) */}
+            <div
               onClick={() => {
                 setIsDailyVocabOpen(true);
                 soundManager.playClick();
               }}
-              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-850 border border-amber-500/30 text-amber-300 transition shrink-0 cursor-pointer"
-              title="Cofre de Palabras Diarias (+15 XP)"
+              className="group p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/70 hover:border-emerald-500/40 transition flex items-center justify-between gap-2 cursor-pointer shadow-xs"
             >
-              <Gift className="w-4 h-4 text-amber-400" />
-            </button>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400 group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-emerald-300 transition truncate leading-none">
+                    3 Términos de Hoy
+                  </p>
+                  <p className="text-[9px] text-slate-400 truncate mt-0.5">
+                    Adquisición léxica diaria
+                  </p>
+                </div>
+              </div>
+              <span className="shrink-0 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20 group-hover:border-emerald-500/40 transition">
+                +15 XP
+              </span>
+            </div>
+
+            {/* Tarea 2: Sesión de Repaso SRS */}
+            <div
+              onClick={() => {
+                setCurrentView('REVIEW');
+                soundManager.playClick();
+              }}
+              className="group p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/70 hover:border-cyan-500/40 transition flex items-center justify-between gap-2 cursor-pointer shadow-xs"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center shrink-0 text-cyan-400 group-hover:scale-105 transition-transform">
+                  <Brain className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-cyan-300 transition truncate leading-none">
+                    Repaso Espaciado (SRS)
+                  </p>
+                  <p className="text-[9px] text-slate-400 truncate mt-0.5">
+                    Fijar tarjetas en memoria
+                  </p>
+                </div>
+              </div>
+              <span className="shrink-0 text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20 group-hover:border-cyan-500/40 transition">
+                +20 XP
+              </span>
+            </div>
+
+            {/* Tarea 3: Inmersión Auditiva */}
+            <div
+              onClick={() => {
+                setCurrentView('IMMERSION');
+                soundManager.playClick();
+              }}
+              className="group p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/70 hover:border-amber-500/40 transition flex items-center justify-between gap-2 cursor-pointer shadow-xs"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-amber-950/60 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 group-hover:scale-105 transition-transform">
+                  <Headphones className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-amber-300 transition truncate leading-none">
+                    Inmersión Auditiva
+                  </p>
+                  <p className="text-[9px] text-slate-400 truncate mt-0.5">
+                    Input comprensible i+1
+                  </p>
+                </div>
+              </div>
+              <span className="shrink-0 text-[10px] font-mono font-bold text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-500/20 group-hover:border-amber-500/40 transition">
+                +20 XP
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1964,7 +2138,7 @@ function FluentiaPathContent() {
       </aside>
 
       {/* ================= CONTENIDO CENTRAL ================= */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 md:pl-72 w-full">
 
         {/* VISTA 1: CAMINO UNIVERSITARIO DE APRENDIZAJE (MODULAR) */}
         {currentView === 'PATH' && (
@@ -2945,6 +3119,14 @@ function FluentiaPathContent() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Tutorial Interactivo de Bienvenida (Onboarding Tour sobre la Ruta de Aprendizaje) */}
+      <OnboardingTour
+        isOpen={isTourOpen}
+        onClose={handleTourDismiss}
+        onComplete={handleTourDismiss}
+        mode="path"
+      />
 
     </div>
   );

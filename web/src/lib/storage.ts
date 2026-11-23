@@ -101,6 +101,7 @@ export interface UserProfile {
   preferredStudyTime: 'morning' | 'afternoon' | 'night';
   interfaceLanguage: 'es' | 'en';
   isAdmin?: boolean;
+  hasSeenTour?: boolean;
 }
 
 const DEFAULT_USER_PROFILE: UserProfile = {
@@ -120,7 +121,8 @@ const DEFAULT_USER_PROFILE: UserProfile = {
   createdAt: new Date().toISOString().split('T')[0],
   accentPreference: 'us',
   preferredStudyTime: 'afternoon',
-  interfaceLanguage: 'es'
+  interfaceLanguage: 'es',
+  hasSeenTour: false
 };
 
 const KEYS = {
@@ -147,6 +149,7 @@ const KEYS = {
   IS_PREMIUM: 'fluentia_is_premium',
   PAYMENT_REQUESTS: 'fluentia_payment_requests',
   LICENSE_CODES: 'fluentia_license_codes',
+  HAS_SEEN_TOUR: 'nativa_has_seen_tour',
 };
 
 function getLangKey(baseKey: string, lang: string = 'english'): string {
@@ -203,6 +206,24 @@ export const AppStorage = {
       localStorage.setItem(getLangKey(KEYS.STREAK_DAYS, lang), '0');
       localStorage.setItem(getLangKey(KEYS.IMMERSION_MINUTES, lang), '0');
       localStorage.setItem(getLangKey(KEYS.SKILLS, lang), JSON.stringify({ listening: 0, speaking: 0, reading: 0, writing: 0 }));
+      localStorage.setItem(KEYS.HAS_SEEN_TOUR, 'false');
+    } catch {}
+  },
+
+  hasSeenTour(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem(KEYS.HAS_SEEN_TOUR) === 'true';
+    } catch {}
+    return false;
+  },
+
+  setHasSeenTour(value: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(KEYS.HAS_SEEN_TOUR, value ? 'true' : 'false');
+      const current = this.getUserProfile();
+      this.saveUserProfile({ ...current, hasSeenTour: value });
     } catch {}
   },
 
@@ -731,6 +752,9 @@ export const AppStorage = {
         if (profile.xp !== undefined && profile.xp !== null) this.saveXp(profile.xp);
         if (profile.streak !== undefined && profile.streak !== null) this.saveStreak(profile.streak);
         if (profile.is_premium !== undefined) this.setUserPremium(Boolean(profile.is_premium));
+        if (profile.has_seen_tour !== undefined && profile.has_seen_tour !== null) {
+          this.setHasSeenTour(Boolean(profile.has_seen_tour));
+        }
         const currentProfile = this.getUserProfile();
         this.saveUserProfile({
           ...currentProfile,
@@ -739,7 +763,8 @@ export const AppStorage = {
           name: profile.name || currentProfile.name,
           targetLevel: profile.current_level || currentProfile.targetLevel,
           avatarUrl: profile.avatar_url || undefined,
-          isAdmin: Boolean(profile.is_admin || profile.email === 'adohuken2005@gmail.com')
+          isAdmin: Boolean(profile.is_admin || profile.email === 'adohuken2005@gmail.com'),
+          hasSeenTour: profile.has_seen_tour !== undefined ? Boolean(profile.has_seen_tour) : currentProfile.hasSeenTour
         });
       }
 
@@ -838,6 +863,7 @@ export const AppStorage = {
         streak,
         current_level: profile.targetLevel?.split(' ')[0] || 'A1',
         is_premium: this.isUserPremium(),
+        has_seen_tour: this.hasSeenTour(),
         updated_at: new Date().toISOString()
       });
 

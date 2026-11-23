@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   streak INTEGER NOT NULL DEFAULT 0,
   is_premium BOOLEAN NOT NULL DEFAULT FALSE,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  has_seen_tour BOOLEAN NOT NULL DEFAULT FALSE,
   license_code TEXT,
   avatar_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::TEXT, NOW()) NOT NULL,
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- Asegurar columna is_admin si la tabla ya existía
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS has_seen_tour BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Otorgar rol de administrador al fundador
 UPDATE public.profiles SET is_admin = TRUE WHERE email = 'adohuken2005@gmail.com';

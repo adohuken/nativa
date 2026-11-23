@@ -47,6 +47,7 @@ export interface DatabaseProfile {
   streak: number;
   is_premium: boolean;
   is_admin?: boolean;
+  has_seen_tour?: boolean;
   license_code?: string;
   created_at?: string;
   updated_at?: string;

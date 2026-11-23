@@ -31,7 +31,8 @@ import {
   ChevronRight,
   LogOut,
   User,
-  ArrowLeft
+  ArrowLeft,
+  HelpCircle
 } from 'lucide-react';
 import { FluentiaLogo, NativaLogo } from '@/components/fluentia-logo';
 import { LANGUAGES_REGISTRY, LanguageHubEntry, getAllLanguages } from '@/content/course-content';
@@ -41,6 +42,7 @@ import { UserProfileModal } from '@/components/user-profile-modal';
 import { AuthModal } from '@/components/auth-modal';
 import { PlacementTestModal } from '@/components/placement-test-modal';
 import { DailyVocabularyModal } from '@/components/learn';
+import { OnboardingTour } from '@/components/onboarding-tour';
 import { APP_NAME } from '@/lib/config';
 import { isSupabaseConfigured, getSupabaseClient } from '@/lib/supabase';
 
@@ -60,6 +62,7 @@ export default function StudentDashboardPage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isPlacementTestOpen, setIsPlacementTestOpen] = useState(false);
   const [isDailyVocabOpen, setIsDailyVocabOpen] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
   const [missionsState, setMissionsState] = useState<DailyMissionsState>(() => AppStorage.getDailyMissions());
@@ -167,6 +170,35 @@ export default function StudentDashboardPage() {
     return () => clearInterval(missionInterval);
   }, []);
 
+  // Auto-disparar Onboarding Tour si el usuario es nuevo o no lo ha visto
+  useEffect(() => {
+    if (!AppStorage.hasSeenTour()) {
+      const tourTimer = setTimeout(() => {
+        setIsTourOpen(true);
+      }, 800);
+      return () => clearTimeout(tourTimer);
+    }
+  }, []);
+
+  const handleTourDismiss = async () => {
+    setIsTourOpen(false);
+    AppStorage.setHasSeenTour(true);
+    const client = getSupabaseClient();
+    if (client && isSupabaseConfigured) {
+      try {
+        const { data: { session } } = await client.auth.getSession();
+        if (session?.user?.id) {
+          await client.from('profiles').update({
+            has_seen_tour: true,
+            updated_at: new Date().toISOString()
+          }).eq('id', session.user.id);
+        }
+      } catch (err) {
+        console.warn('Error guardando has_seen_tour en Supabase:', err);
+      }
+    }
+  };
+
   const toggleSound = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
@@ -230,7 +262,10 @@ export default function StudentDashboardPage() {
           </Link>
 
           {/* Stats Gamer (Racha | XP | Tiempo) */}
-          <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-[#0b101c] border border-slate-800/90 text-xs font-mono shadow-inner">
+          <div 
+            data-tour="tour-header-stats"
+            className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-[#0b101c] border border-slate-800/90 text-xs font-mono shadow-inner"
+          >
             <div className="flex items-center gap-1.5 text-amber-400" title="Racha de estudio diario">
               <Flame className="w-4 h-4 fill-current drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]" />
               <span className="font-extrabold">{streakDays}d</span>
@@ -246,6 +281,18 @@ export default function StudentDashboardPage() {
               <span className="font-extrabold">{immersionMinutes}m</span>
             </div>
           </div>
+
+          {/* Botón de Ayuda Permanente: Iniciar Onboarding Tour */}
+          <button
+            onClick={() => {
+              setIsTourOpen(true);
+              soundManager.playClick();
+            }}
+            title="Ver Tutorial Interactivo (Tour de Bienvenida)"
+            className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-emerald-300 flex items-center justify-center transition cursor-pointer group shadow-sm"
+          >
+            <HelpCircle className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+          </button>
 
           {/* Sonido Zen */}
           <button
@@ -328,6 +375,7 @@ export default function StudentDashboardPage() {
               {/* Botón PROTAGONISTA: Continuar Inglés General */}
               <Link
                 href="/learn/english"
+                data-tour="tour-btn-general"
                 onClick={() => soundManager.playClick()}
                 className="px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:brightness-110 active:scale-95 text-slate-950 font-black text-sm sm:text-base transition shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-3 group border border-emerald-300/40 cursor-pointer"
               >
@@ -341,6 +389,7 @@ export default function StudentDashboardPage() {
               {/* Botón SECUNDARIO: Call Center BPO */}
               <Link
                 href="/learn/english/call-center"
+                data-tour="tour-btn-callcenter"
                 onClick={() => soundManager.playClick()}
                 className="px-5 py-3.5 rounded-2xl bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:text-amber-200 transition text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 active:scale-95 shadow-sm group cursor-pointer"
               >
@@ -356,6 +405,7 @@ export default function StudentDashboardPage() {
             
             {/* WIDGET 1: COFRE DE VOCABULARIO DIARIO (DAILY DROP) */}
             <div
+              data-tour="tour-daily-words"
               onClick={() => {
                 setIsDailyVocabOpen(true);
                 soundManager.playClick();
@@ -387,7 +437,10 @@ export default function StudentDashboardPage() {
             </div>
 
             {/* WIDGET 2: MISIONES DE HOY CON BARRA DE PROGRESO */}
-            <div className="flex-1 p-5 rounded-3xl bg-[#090d16]/90 border border-slate-800/90 shadow-xl flex flex-col justify-between space-y-3.5">
+            <div 
+              data-tour="tour-daily-missions"
+              className="flex-1 p-5 rounded-3xl bg-[#090d16]/90 border border-slate-800/90 shadow-xl flex flex-col justify-between space-y-3.5"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
@@ -568,7 +621,17 @@ export default function StudentDashboardPage() {
           setUserXp(AppStorage.getXp('english'));
           setImmersionMinutes(AppStorage.getImmersionMinutes('english'));
           setCompletedEnglishNodes(AppStorage.getCompletedNodes('english'));
+          if (!AppStorage.hasSeenTour()) {
+            setTimeout(() => setIsTourOpen(true), 600);
+          }
         }}
+      />
+
+      {/* Tutorial Interactivo de Bienvenida (Onboarding Tour Gamer) */}
+      <OnboardingTour
+        isOpen={isTourOpen}
+        onClose={handleTourDismiss}
+        onComplete={handleTourDismiss}
       />
 
     </div>

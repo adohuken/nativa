@@ -94,7 +94,10 @@ export function NodeCard({
     <div className="w-full flex flex-col items-center">
       {/* Banner de Unidad con Proyecto Universitario Oficial */}
       {isFirstInUnit && (
-        <div className={`w-full max-w-xl my-8 p-6 rounded-3xl bg-gradient-to-br ${theme.bannerBg} border border-slate-800/90 shadow-xl space-y-4`}>
+        <div 
+          data-tour={index === 0 ? "tour-unit-banner" : undefined}
+          className={`w-full max-w-xl my-8 p-6 rounded-3xl bg-gradient-to-br ${theme.bannerBg} border border-slate-800/90 shadow-xl space-y-4`}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3.5">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black font-mono text-base shadow-lg bg-gradient-to-br ${theme.btnGradient} ${theme.btnText}`}>
@@ -141,6 +144,7 @@ export function NodeCard({
         )}
 
         <button
+          data-tour={index === 0 ? "tour-first-node" : undefined}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           onClick={onNodeClick}

@@ -84,7 +84,10 @@ export function LearningMap({
       </div>
 
       {/* Barra de Filtro por Nivel CEFR */}
-      <div className="flex items-center justify-center gap-1.5 flex-wrap p-1.5 bg-[#0b101b] rounded-2xl border border-slate-800/90 text-xs shadow-md">
+      <div 
+        data-tour="tour-level-filters"
+        className="flex items-center justify-center gap-1.5 flex-wrap p-1.5 bg-[#0b101b] rounded-2xl border border-slate-800/90 text-xs shadow-md"
+      >
         {[
           { id: 'ALL', label: 'Todos (24)', dot: 'bg-slate-400', tabActive: 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black shadow-md shadow-emerald-500/20 border-emerald-400', tabInactive: 'bg-[#0d131f] text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-[#12192b]' },
           { id: 'A1', label: 'A1 Fundamentos', dot: 'bg-emerald-400', tabActive: LEVEL_THEMES.A1.tabActive, tabInactive: LEVEL_THEMES.A1.tabInactive },

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -49,6 +49,22 @@ export function AuthModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Reiniciar campos siempre que se abra el modal o cambie de modo para evitar autofill
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      setEmail('');
+      setPassword('');
+      setFullName('');
+      setUsername('');
+      setCountry('');
+      setCity('');
+      setUniversity('');
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
@@ -177,8 +193,12 @@ export function AuthModal({
             createdAt: new Date().toISOString().split('T')[0],
             accentPreference: 'us',
             preferredStudyTime: 'afternoon',
-            interfaceLanguage: 'es'
+            interfaceLanguage: 'es',
+            hasSeenTour: false
           });
+
+          // Resetear estado del tour para que el nuevo usuario lo vea en su Dashboard
+          AppStorage.setHasSeenTour(false);
 
           // Guardar inmediatamente en tabla profiles y user_progress de Supabase
           try {
@@ -190,6 +210,7 @@ export function AuthModal({
               xp: 0,
               streak: 0,
               is_premium: profile.is_premium,
+              has_seen_tour: false,
               updated_at: new Date().toISOString()
             });
 
@@ -252,7 +273,8 @@ export function AuthModal({
               current_level: 'A1',
               xp: 140,
               streak: 1,
-              is_premium: false
+              is_premium: false,
+              has_seen_tour: false
             };
             try {
               await client.from('profiles').upsert({
@@ -263,6 +285,7 @@ export function AuthModal({
                 xp: initialProfile.xp,
                 streak: initialProfile.streak,
                 is_premium: initialProfile.is_premium,
+                has_seen_tour: false,
                 updated_at: new Date().toISOString()
               });
               profileData = initialProfile;
@@ -270,6 +293,10 @@ export function AuthModal({
               console.warn('No se pudo crear perfil en profiles:', createErr);
               profileData = initialProfile;
             }
+          }
+
+          if (profileData && profileData.has_seen_tour !== undefined) {
+            AppStorage.setHasSeenTour(Boolean(profileData.has_seen_tour));
           }
 
           const isAdminUser = Boolean(profileData.is_admin || profileData.email === 'adohuken2005@gmail.com');
@@ -392,7 +419,14 @@ export function AuthModal({
         <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-[#0e1626] border border-slate-800 text-xs font-bold">
           <button
             type="button"
-            onClick={() => { setMode('login'); setErrorMessage(null); soundManager.playClick(); }}
+            onClick={() => { 
+              setMode('login'); 
+              setErrorMessage(null); 
+              setSuccessMessage(null);
+              setEmail('');
+              setPassword('');
+              soundManager.playClick(); 
+            }}
             className={`py-2 rounded-xl transition cursor-pointer ${
               mode === 'login'
                 ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black shadow-sm'
@@ -403,7 +437,16 @@ export function AuthModal({
           </button>
           <button
             type="button"
-            onClick={() => { setMode('register'); setErrorMessage(null); soundManager.playClick(); }}
+            onClick={() => { 
+              setMode('register'); 
+              setErrorMessage(null); 
+              setSuccessMessage(null);
+              setEmail('');
+              setPassword('');
+              setFullName('');
+              setUsername('');
+              soundManager.playClick(); 
+            }}
             className={`py-2 rounded-xl transition cursor-pointer ${
               mode === 'register'
                 ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black shadow-sm'
@@ -430,7 +473,7 @@ export function AuthModal({
         )}
 
         {/* Formulario */}
-        <form onSubmit={handleEmailAuth} className="space-y-3.5">
+        <form onSubmit={handleEmailAuth} className="space-y-3.5" autoComplete="off">
           {mode === 'register' && (
             <>
               <div className="space-y-1">
@@ -546,6 +589,8 @@ export function AuthModal({
               <input
                 type="email"
                 required
+                name={mode === 'register' ? 'nativa_reg_email' : 'email'}
+                autoComplete={mode === 'register' ? 'off' : 'email'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@correo.com"
@@ -564,6 +609,8 @@ export function AuthModal({
                 type="password"
                 required
                 minLength={6}
+                name={mode === 'register' ? 'nativa_reg_password' : 'password'}
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
