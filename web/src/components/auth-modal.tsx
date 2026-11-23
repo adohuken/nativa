@@ -326,7 +326,11 @@ export function AuthModal({
           setTimeout(() => {
             onClose();
             if (typeof window !== 'undefined') {
-              window.location.href = '/dashboard';
+              if (isAdminUser && window.location.search.includes('unauthorized_admin')) {
+                window.location.href = '/admin';
+              } else {
+                window.location.href = '/dashboard';
+              }
             }
           }, 1000);
         }

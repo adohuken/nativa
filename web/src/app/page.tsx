@@ -53,6 +53,15 @@ export default function PublicLandingPage() {
   useEffect(() => {
     setSoundEnabled(soundManager.enabled);
 
+    // Si fue redirigido desde /admin por falta de credenciales, abrir el modal de login automáticamente
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get('error') === 'unauthorized_admin') {
+        setAuthMode('login');
+        setIsAuthModalOpen(true);
+      }
+    }
+
     const client = getSupabaseClient();
     if (client && isSupabaseConfigured) {
       client.auth.getSession().then(({ data: { session } }) => {
