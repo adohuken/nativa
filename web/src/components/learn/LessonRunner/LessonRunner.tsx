@@ -109,11 +109,9 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
       if (isContinuousPlaying) {
         setIsContinuousPaused(true);
       }
-      if (resumeWatchdogRef.current) {
-        clearTimeout(resumeWatchdogRef.current);
-        resumeWatchdogRef.current = null;
-      }
-      window.speechSynthesis.pause();
+      // Cancelar inmediatamente la síntesis para liberar el motor de audio
+      // Esto evita el bug de Chromium donde pause() congela el sintetizador en silencio permanente
+      window.speechSynthesis.cancel();
     }
   };
 
@@ -123,31 +121,17 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
       setIsAudioPaused(false);
       if (isContinuousPlaying) {
         setIsContinuousPaused(false);
-      }
-
-      // 1. Intentar reanudar nativamente
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-
-      // 2. Watchdog de seguridad (Chromium bug workaround):
-      // Si después de 180ms el motor del navegador sigue en pausa o no está hablando,
-      // reanudar hablando exactamente el fragmento de texto restante desde pausedCharIndexRef.current
-      if (resumeWatchdogRef.current) clearTimeout(resumeWatchdogRef.current);
-      resumeWatchdogRef.current = setTimeout(() => {
-        if (!isAudioPausedRef.current && (!window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
-          if (isContinuousPlaying && currentLineRef.current !== null) {
-            playLineAt(currentLineRef.current, pausedCharIndexRef.current);
-          } else if (currentSpeakingTextRef.current) {
-            speakTextFromChar(
-              currentSpeakingTextRef.current,
-              pausedCharIndexRef.current,
-              currentSpeakingLineIdxRef.current,
-              currentSpeakingPitchRef.current
-            );
-          }
+        if (currentLineRef.current !== null) {
+          playLineAt(currentLineRef.current, pausedCharIndexRef.current);
         }
-      }, 180);
+      } else if (currentSpeakingTextRef.current) {
+        speakTextFromChar(
+          currentSpeakingTextRef.current,
+          pausedCharIndexRef.current,
+          currentSpeakingLineIdxRef.current,
+          currentSpeakingPitchRef.current
+        );
+      }
     }
   };
 

@@ -162,25 +162,13 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
         // Pausar
         isAudioPausedRef.current = true;
         setIsAudioPaused(true);
-        if (resumeWatchdogRef.current) {
-          clearTimeout(resumeWatchdogRef.current);
-          resumeWatchdogRef.current = null;
-        }
-        window.speechSynthesis.pause();
+        window.speechSynthesis.cancel();
         return;
       } else {
-        // Reanudar
+        // Reanudar inmediatamente sin silencio
         isAudioPausedRef.current = false;
         setIsAudioPaused(false);
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-        if (resumeWatchdogRef.current) clearTimeout(resumeWatchdogRef.current);
-        resumeWatchdogRef.current = setTimeout(() => {
-          if (!isAudioPausedRef.current && (!window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
-            speakTextFromChar(currentSpeakingTextRef.current, pausedCharIndexRef.current);
-          }
-        }, 180);
+        speakTextFromChar(currentSpeakingTextRef.current, pausedCharIndexRef.current);
         return;
       }
     }

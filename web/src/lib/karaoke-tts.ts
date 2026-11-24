@@ -303,8 +303,9 @@ class KaraokeTTSController {
       clearTimeout(this.resumeWatchdogId);
       this.resumeWatchdogId = null;
     }
+    // Cancelar la síntesis para evitar que Chromium quede colgado en silencio con pause()
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.pause();
+      window.speechSynthesis.cancel();
     }
   }
 
@@ -312,23 +313,8 @@ class KaraokeTTSController {
     if (!this.isPlaying || !this.isPaused) return;
     this.isPaused = false;
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
-    // 1. Intentar reanudar a nivel nativo
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    }
-
-    // 2. Watchdog de seguridad (Chromium bug):
-    // Si después de 180ms el motor del navegador sigue en pausa o no está hablando activamente,
-    // reanudar hablando exactamente el texto restante desde pausedCharIndex
-    if (this.resumeWatchdogId) clearTimeout(this.resumeWatchdogId);
-    this.resumeWatchdogId = setTimeout(() => {
-      if (this.isPlaying && !this.isPaused) {
-        if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
-          this.speakRemainingInCurrentParagraph();
-        }
-      }
-    }, 180);
+    // Reanudar inmediatamente hablando el fragmento restante desde la posición guardada
+    this.speakRemainingInCurrentParagraph();
   }
 
   private speakRemainingInCurrentParagraph(): void {

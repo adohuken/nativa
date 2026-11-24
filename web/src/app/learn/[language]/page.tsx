@@ -727,7 +727,7 @@ function FluentiaPathContent() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       isAudioPausedRef.current = true;
       setIsAudioPaused(true);
-      window.speechSynthesis.pause();
+      window.speechSynthesis.cancel();
     }
   };
 
@@ -735,21 +735,14 @@ function FluentiaPathContent() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       isAudioPausedRef.current = false;
       setIsAudioPaused(false);
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
+      if (currentUtteranceTextRef.current) {
+        speakTextFromChar(
+          currentUtteranceTextRef.current,
+          pausedCharIndexRef.current,
+          activeAudioIndex ?? undefined,
+          currentUtterancePitchRef.current
+        );
       }
-      setTimeout(() => {
-        if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
-          if (currentUtteranceTextRef.current) {
-            speakTextFromChar(
-              currentUtteranceTextRef.current,
-              pausedCharIndexRef.current,
-              activeAudioIndex ?? undefined,
-              currentUtterancePitchRef.current
-            );
-          }
-        }
-      }, 180);
     }
   };
 
