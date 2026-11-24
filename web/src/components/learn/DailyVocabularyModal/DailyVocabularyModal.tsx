@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -54,6 +54,12 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
   const [audioSpeed, setAudioSpeed] = useState<number>(0.85);
   const [speakingText, setSpeakingText] = useState<string | null>(null);
   const [isAudioPaused, setIsAudioPaused] = useState<boolean>(false);
+  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
+
+  const pausedCharIndexRef = useRef<number>(0);
+  const currentSpeakingTextRef = useRef<string>('');
+  const isAudioPausedRef = useRef<boolean>(false);
+  const resumeWatchdogRef = useRef<any>(null);
   const [challengeResult, setChallengeResult] = useState<{
     passed: boolean;
     score: number;
@@ -90,44 +96,114 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
     new RegExp(`\\b${tw.toLowerCase()}`, 'i').test(essayText)
   );
 
+  const speakTextFromChar = (fullText: string, fromChar: number) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const safeFrom = Math.max(0, Math.min(fromChar, fullText.length));
+    const textToSpeak = safeFrom > 0 ? fullText.slice(safeFrom) : fullText;
+    if (!textToSpeak.trim()) {
+      setSpeakingText(null);
+      setIsAudioPaused(false);
+      setActiveWordIndex(null);
+      pausedCharIndexRef.current = 0;
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    setSpeakingText(fullText);
+    setIsAudioPaused(false);
+    isAudioPausedRef.current = false;
+    currentSpeakingTextRef.current = fullText;
+    pausedCharIndexRef.current = safeFrom;
+
+    // Calcular palabra activa inicial
+    const wordsBefore = fullText.slice(0, safeFrom).trim().split(/\s+/).filter(Boolean);
+    setActiveWordIndex(wordsBefore.length);
+
+    const u = new SpeechSynthesisUtterance(textToSpeak);
+    u.lang = 'en-US';
+    u.rate = audioSpeed;
+
+    u.onboundary = (event: SpeechSynthesisEvent) => {
+      if (isAudioPausedRef.current) return;
+      const relChar = event.charIndex !== undefined ? event.charIndex : 0;
+      const absChar = safeFrom + relChar;
+      pausedCharIndexRef.current = absChar;
+
+      const wordsUpToNow = fullText.slice(0, absChar).trim().split(/\s+/).filter(Boolean);
+      setActiveWordIndex(wordsUpToNow.length);
+    };
+
+    u.onend = () => {
+      if (isAudioPausedRef.current) return;
+      setSpeakingText(null);
+      setIsAudioPaused(false);
+      setActiveWordIndex(null);
+      pausedCharIndexRef.current = 0;
+      currentSpeakingTextRef.current = '';
+    };
+
+    u.onerror = (e) => {
+      if (isAudioPausedRef.current || (e as any)?.error === 'interrupted') return;
+      setSpeakingText(null);
+      setIsAudioPaused(false);
+      setActiveWordIndex(null);
+      pausedCharIndexRef.current = 0;
+    };
+
+    window.speechSynthesis.speak(u);
+  };
+
   const toggleSpeak = (text: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     
+    // Si ya estamos reproduciendo este mismo texto
     if (speakingText === text) {
       if (!isAudioPaused) {
-        window.speechSynthesis.pause();
+        // Pausar
+        isAudioPausedRef.current = true;
         setIsAudioPaused(true);
+        if (resumeWatchdogRef.current) {
+          clearTimeout(resumeWatchdogRef.current);
+          resumeWatchdogRef.current = null;
+        }
+        window.speechSynthesis.pause();
         return;
       } else {
-        window.speechSynthesis.resume();
+        // Reanudar
+        isAudioPausedRef.current = false;
         setIsAudioPaused(false);
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        if (resumeWatchdogRef.current) clearTimeout(resumeWatchdogRef.current);
+        resumeWatchdogRef.current = setTimeout(() => {
+          if (!isAudioPausedRef.current && (!window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
+            speakTextFromChar(currentSpeakingTextRef.current, pausedCharIndexRef.current);
+          }
+        }, 180);
         return;
       }
     }
 
-    window.speechSynthesis.cancel();
-    setSpeakingText(text);
-    setIsAudioPaused(false);
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
-    u.rate = audioSpeed;
-    u.onend = () => {
-      setSpeakingText(null);
-      setIsAudioPaused(false);
-    };
-    u.onerror = () => {
-      setSpeakingText(null);
-      setIsAudioPaused(false);
-    };
-    window.speechSynthesis.speak(u);
+    // Nuevo texto desde el principio
+    pausedCharIndexRef.current = 0;
+    speakTextFromChar(text, 0);
   };
 
   const stopAudio = () => {
+    isAudioPausedRef.current = false;
+    pausedCharIndexRef.current = 0;
+    currentSpeakingTextRef.current = '';
+    if (resumeWatchdogRef.current) {
+      clearTimeout(resumeWatchdogRef.current);
+      resumeWatchdogRef.current = null;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
     setSpeakingText(null);
     setIsAudioPaused(false);
+    setActiveWordIndex(null);
   };
 
   const handleClaim = async () => {
@@ -331,7 +407,27 @@ export const DailyVocabularyModal: React.FC<DailyVocabularyModalProps> = ({
 
                       <div className="p-3 rounded-xl bg-[#070b14] border border-slate-800/80 space-y-1">
                         <div className="flex items-center justify-between text-xs text-slate-200">
-                          <span className="font-semibold italic text-emerald-300">"{wordItem.example_sentence}"</span>
+                          <span className="font-semibold italic text-emerald-300">
+                            {isSentencePlaying ? (
+                              wordItem.example_sentence.split(/\s+/).filter(Boolean).map((word, wIdx) => {
+                                const isWordActive = activeWordIndex === wIdx;
+                                return (
+                                  <span
+                                    key={wIdx}
+                                    className={`transition-all duration-150 inline-block mr-1 ${
+                                      isWordActive
+                                        ? 'bg-gradient-to-r from-emerald-400 to-teal-300 text-slate-950 font-black rounded px-1 scale-105 ring-1 ring-emerald-300'
+                                        : ''
+                                    }`}
+                                  >
+                                    {word}
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              `"${wordItem.example_sentence}"`
+                            )}
+                          </span>
                           <button
                             onClick={() => toggleSpeak(wordItem.example_sentence)}
                             className={`p-1 rounded-md transition cursor-pointer ${

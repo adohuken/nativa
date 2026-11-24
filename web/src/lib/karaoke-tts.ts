@@ -72,12 +72,28 @@ class KaraokeTTSController {
   private speechLang: string = 'en-US';
   private accent: AccentPreference = 'uk';
 
+  // Variables de estado de pausa y posición exacta (sin pérdida de progreso)
+  private pausedCharIndex: number = 0;
+  private currentWordIndex: number = 0;
+  private lastWordPos: KaraokeWordPosition | null = null;
+  private currentParagraphText: string = '';
+  private currentWordOffsets: { start: number; end: number; word: string; index: number }[] = [];
+  private resumeWatchdogId: any = null;
+
   public get active(): boolean {
     return this.isPlaying;
   }
 
   public get paused(): boolean {
     return this.isPaused;
+  }
+
+  public get wordPosition(): KaraokeWordPosition | null {
+    return this.lastWordPos;
+  }
+
+  public get pausedChar(): number {
+    return this.pausedCharIndex;
   }
 
   public play(
@@ -96,6 +112,12 @@ class KaraokeTTSController {
       return;
     }
 
+    // Si ya está pausado con los mismos párrafos, reanudar en vez de reiniciar
+    if (this.isPaused && this.paragraphs === paragraphs) {
+      this.resume();
+      return;
+    }
+
     this.stop();
 
     this.paragraphs = paragraphs;
@@ -105,31 +127,35 @@ class KaraokeTTSController {
     this.onWordCallback = options?.onWord || null;
     this.onEndCallback = options?.onEnd || null;
     this.currentParagraph = options?.startParagraphIndex || 0;
+    this.pausedCharIndex = 0;
+    this.currentWordIndex = 0;
+    this.lastWordPos = null;
     this.isPlaying = true;
     this.isPaused = false;
 
-    this.speakNextParagraph();
+    this.speakParagraph(this.currentParagraph, 0);
   }
 
-  private speakNextParagraph(): void {
-    if (!this.isPlaying || this.currentParagraph >= this.paragraphs.length) {
+  private speakParagraph(pIndex: number, fromCharIndex: number = 0): void {
+    if (!this.isPlaying || pIndex >= this.paragraphs.length) {
       this.stop();
       if (this.onEndCallback) this.onEndCallback();
       return;
     }
 
-    const pText = this.paragraphs[this.currentParagraph];
+    const pText = this.paragraphs[pIndex];
     if (!pText || !pText.trim()) {
-      this.currentParagraph++;
-      this.speakNextParagraph();
+      this.currentParagraph = pIndex + 1;
+      this.pausedCharIndex = 0;
+      this.speakParagraph(this.currentParagraph, 0);
       return;
     }
 
-    // Dividir en palabras preservando índices
-    const words = pText.split(/\s+/).filter(Boolean);
-    const pIndex = this.currentParagraph;
+    this.currentParagraph = pIndex;
+    this.currentParagraphText = pText;
 
-    // Calcular offsets de inicio de cada palabra en el párrafo
+    // Dividir en palabras preservando índices globales del párrafo
+    const words = pText.split(/\s+/).filter(Boolean);
     const wordOffsets: { start: number; end: number; word: string; index: number }[] = [];
     let searchPos = 0;
     words.forEach((w, idx) => {
@@ -138,14 +164,30 @@ class KaraokeTTSController {
       wordOffsets.push({ start, end, word: w, index: idx });
       searchPos = end;
     });
+    this.currentWordOffsets = wordOffsets;
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(pText);
+    const safeFromChar = Math.max(0, Math.min(fromCharIndex, pText.length));
+    this.pausedCharIndex = safeFromChar;
+
+    // Si estamos reanudando desde un carácter avanzado, hablar solo el fragmento restante
+    const textToSpeak = safeFromChar > 0 ? pText.slice(safeFromChar) : pText;
+    if (!textToSpeak.trim()) {
+      this.currentParagraph = pIndex + 1;
+      this.pausedCharIndex = 0;
+      this.speakParagraph(this.currentParagraph, 0);
+      return;
+    }
+
+    // Cancelar cualquier utterance previo antes de lanzar el nuevo fragmento
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = this.speechLang;
     utterance.rate = this.speechRate;
     utterance.pitch = 1.0;
 
-    // Asignar voz nativa de alta fidelidad según el acento preferido
     const voice = getBestVoiceForAccent(this.accent);
     if (voice) {
       utterance.voice = voice;
@@ -154,67 +196,96 @@ class KaraokeTTSController {
 
     this.utterance = utterance;
 
-    let fallbackWordIdx = 0;
+    // Localizar palabra inicial al comenzar o reanudar
+    let matchedWordIdx = wordOffsets.findIndex(w => w.start >= safeFromChar || (w.start <= safeFromChar && w.end >= safeFromChar));
+    if (matchedWordIdx < 0) matchedWordIdx = 0;
+    this.currentWordIndex = matchedWordIdx;
+
+    if (this.onWordCallback && wordOffsets[matchedWordIdx]) {
+      this.lastWordPos = {
+        paragraphIndex: pIndex,
+        wordIndex: matchedWordIdx,
+        word: wordOffsets[matchedWordIdx].word
+      };
+      this.onWordCallback(this.lastWordPos);
+    }
+
     let hasReceivedBoundary = false;
 
     // Sincronización precisa con onboundary nativo
     utterance.onboundary = (event: SpeechSynthesisEvent) => {
+      if (!this.isPlaying || this.isPaused) return;
       hasReceivedBoundary = true;
       if (event.name === 'word' || event.charIndex !== undefined) {
-        const charIdx = event.charIndex;
-        // Buscar qué palabra corresponde a este charIndex
-        const matched = wordOffsets.find(w => charIdx >= w.start && charIdx <= w.end) 
-          || wordOffsets.find(w => Math.abs(charIdx - w.start) <= 2)
-          || wordOffsets[fallbackWordIdx];
+        const relCharIdx = event.charIndex !== undefined ? event.charIndex : 0;
+        const absCharIdx = safeFromChar + relCharIdx;
+        this.pausedCharIndex = absCharIdx;
 
-        if (matched && this.onWordCallback && this.isPlaying) {
-          fallbackWordIdx = matched.index;
-          this.onWordCallback({
+        const matched = wordOffsets.find(w => absCharIdx >= w.start && absCharIdx <= w.end)
+          || wordOffsets.find(w => Math.abs(absCharIdx - w.start) <= 2)
+          || wordOffsets[matchedWordIdx];
+
+        if (matched && this.onWordCallback && this.isPlaying && !this.isPaused) {
+          matchedWordIdx = matched.index;
+          this.currentWordIndex = matched.index;
+          this.lastWordPos = {
             paragraphIndex: pIndex,
             wordIndex: matched.index,
             word: matched.word
-          });
+          };
+          this.onWordCallback(this.lastWordPos);
         }
       }
     };
 
-    // Temporizador de respaldo (Fallback rítmico según WPM) si onboundary no es soportado por el motor del navegador
+    // Temporizador de respaldo si onboundary no es emitido por el motor del navegador
+    if (this.timerId) clearInterval(this.timerId);
     const avgWordDurationMs = Math.max(220, Math.round((60000 / (145 * this.speechRate))));
     this.timerId = setInterval(() => {
       if (!this.isPlaying || this.isPaused) return;
       if (!hasReceivedBoundary) {
-        if (fallbackWordIdx < words.length) {
+        if (matchedWordIdx < words.length) {
+          this.currentWordIndex = matchedWordIdx;
+          this.lastWordPos = {
+            paragraphIndex: pIndex,
+            wordIndex: matchedWordIdx,
+            word: words[matchedWordIdx]
+          };
           if (this.onWordCallback) {
-            this.onWordCallback({
-              paragraphIndex: pIndex,
-              wordIndex: fallbackWordIdx,
-              word: words[fallbackWordIdx]
-            });
+            this.onWordCallback(this.lastWordPos);
           }
-          fallbackWordIdx++;
+          if (wordOffsets[matchedWordIdx]) {
+            this.pausedCharIndex = wordOffsets[matchedWordIdx].start;
+          }
+          matchedWordIdx++;
         }
       }
     }, avgWordDurationMs);
 
     utterance.onend = () => {
+      // Si el utterance terminó debido a una pausa del navegador, no saltar de párrafo
+      if (this.isPaused) return;
       if (this.timerId) clearInterval(this.timerId);
-      if (this.onWordCallback) this.onWordCallback(null);
-      this.currentParagraph++;
-      // Pequeña pausa natural zen entre párrafos (350ms)
+      this.pausedCharIndex = 0;
+      this.currentWordIndex = 0;
+      this.currentParagraph = pIndex + 1;
       setTimeout(() => {
         if (this.isPlaying && !this.isPaused) {
-          this.speakNextParagraph();
+          this.speakParagraph(this.currentParagraph, 0);
         }
       }, 350);
     };
 
     utterance.onerror = (e) => {
+      // No interpretar como error la interrupción voluntaria durante la pausa
+      if (this.isPaused || (e as any)?.error === 'interrupted') return;
       if (this.timerId) clearInterval(this.timerId);
-      if (this.onWordCallback) this.onWordCallback(null);
       console.warn('SpeechSynthesis error:', e);
-      this.currentParagraph++;
+      this.pausedCharIndex = 0;
+      this.currentWordIndex = 0;
+      this.currentParagraph = pIndex + 1;
       if (this.isPlaying && !this.isPaused) {
-        this.speakNextParagraph();
+        this.speakParagraph(this.currentParagraph, 0);
       }
     };
 
@@ -222,28 +293,70 @@ class KaraokeTTSController {
   }
 
   public pause(): void {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying || this.isPaused) return;
     this.isPaused = true;
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
+    if (this.resumeWatchdogId) {
+      clearTimeout(this.resumeWatchdogId);
+      this.resumeWatchdogId = null;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.pause();
     }
   }
 
   public resume(): void {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying || !this.isPaused) return;
     this.isPaused = false;
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    // 1. Intentar reanudar a nivel nativo
+    if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
     }
+
+    // 2. Watchdog de seguridad (Chromium bug):
+    // Si después de 180ms el motor del navegador sigue en pausa o no está hablando activamente,
+    // reanudar hablando exactamente el texto restante desde pausedCharIndex
+    if (this.resumeWatchdogId) clearTimeout(this.resumeWatchdogId);
+    this.resumeWatchdogId = setTimeout(() => {
+      if (this.isPlaying && !this.isPaused) {
+        if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
+          this.speakRemainingInCurrentParagraph();
+        }
+      }
+    }, 180);
+  }
+
+  private speakRemainingInCurrentParagraph(): void {
+    if (!this.isPlaying || this.isPaused) return;
+    const pText = this.paragraphs[this.currentParagraph];
+    if (!pText) {
+      this.currentParagraph++;
+      this.speakParagraph(this.currentParagraph, 0);
+      return;
+    }
+    const fromChar = Math.max(0, Math.min(this.pausedCharIndex, pText.length));
+    this.speakParagraph(this.currentParagraph, fromChar);
   }
 
   public stop(): void {
     this.isPlaying = false;
     this.isPaused = false;
     this.currentParagraph = 0;
+    this.pausedCharIndex = 0;
+    this.currentWordIndex = 0;
+    this.lastWordPos = null;
     if (this.timerId) {
       clearInterval(this.timerId);
       this.timerId = null;
+    }
+    if (this.resumeWatchdogId) {
+      clearTimeout(this.resumeWatchdogId);
+      this.resumeWatchdogId = null;
     }
     if (this.onWordCallback) {
       this.onWordCallback(null);

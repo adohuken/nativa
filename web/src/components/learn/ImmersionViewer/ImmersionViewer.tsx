@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Clock,
   ArrowRight,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { ImmersionStory, IMMERSION_STORIES } from '@/lib/immersion-data';
 import { soundManager } from '@/lib/sound-effects';
+import { karaokeTTS, KaraokeWordPosition } from '@/lib/karaoke-tts';
+import { AppStorage } from '@/lib/storage';
 
 export interface ImmersionViewerProps {
   immersionMinutes: number;
@@ -51,6 +53,67 @@ export function ImmersionViewer({
   onFinishStory
 }: ImmersionViewerProps) {
   const [internalSpeed, setInternalSpeed] = useState<number>(audioSpeed);
+  const [karaokeWord, setKaraokeWord] = useState<KaraokeWordPosition | null>(null);
+  const [localIsPlaying, setLocalIsPlaying] = useState<boolean>(false);
+  const [localIsPaused, setLocalIsPaused] = useState<boolean>(false);
+
+  const currentSpeed = onSpeedChange ? audioSpeed : internalSpeed;
+  const isPlaying = localIsPlaying || isPlayingAudio;
+  const isPaused = localIsPaused || isAudioPaused;
+
+  // Limpiar audio de inmersión al cambiar de historia o desmontar
+  useEffect(() => {
+    return () => {
+      karaokeTTS.stop();
+      setLocalIsPlaying(false);
+      setLocalIsPaused(false);
+      setKaraokeWord(null);
+    };
+  }, [selectedStory?.id]);
+
+  const handleTogglePlay = () => {
+    if (!selectedStory) return;
+    soundManager.playClick();
+
+    if (isPlaying) {
+      if (isPaused) {
+        // Reanudar exactamente desde la palabra y carácter donde se pausó
+        karaokeTTS.resume();
+        setLocalIsPaused(false);
+        if (onResumeAudio) onResumeAudio();
+      } else {
+        // Pausar y conservar la palabra resaltada en pantalla
+        karaokeTTS.pause();
+        setLocalIsPaused(true);
+        if (onPauseAudio) onPauseAudio();
+      }
+    } else {
+      // Iniciar reproducción desde el principio
+      setLocalIsPlaying(true);
+      setLocalIsPaused(false);
+      const userProfile = AppStorage.getUserProfile();
+      karaokeTTS.play(selectedStory.paragraphs, {
+        rate: currentSpeed,
+        accent: userProfile?.accentPreference || 'uk',
+        onWord: (pos) => setKaraokeWord(pos),
+        onEnd: () => {
+          setLocalIsPlaying(false);
+          setLocalIsPaused(false);
+          setKaraokeWord(null);
+          if (onStopAudio) onStopAudio();
+        }
+      });
+    }
+  };
+
+  const handleStop = () => {
+    soundManager.playClick();
+    karaokeTTS.stop();
+    setLocalIsPlaying(false);
+    setLocalIsPaused(false);
+    setKaraokeWord(null);
+    if (onStopAudio) onStopAudio();
+  };
 
   const handleSpeedSelect = (speed: number) => {
     setInternalSpeed(speed);
@@ -58,14 +121,8 @@ export function ImmersionViewer({
     if (onSpeedChange) {
       onSpeedChange(speed);
     }
-    // Si ya está reproduciendo, reiniciar con nueva velocidad
-    if (isPlayingAudio && selectedStory) {
-      const fullText = selectedStory.paragraphs.join(' ');
-      onSpeakText(fullText);
-    }
   };
 
-  const currentSpeed = onSpeedChange ? audioSpeed : internalSpeed;
   return (
     <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full space-y-8 pb-28 md:pb-8">
       {/* Header de la Sección de Inmersión */}
@@ -163,35 +220,21 @@ export function ImmersionViewer({
               <div className="pt-3 flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      if (isPlayingAudio) {
-                        if (isAudioPaused) {
-                          if (onResumeAudio) onResumeAudio();
-                          else if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.resume();
-                        } else {
-                          if (onPauseAudio) onPauseAudio();
-                          else if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.pause();
-                        }
-                      } else {
-                        const fullText = selectedStory.paragraphs.join(' ');
-                        onSpeakText(fullText);
-                      }
-                      soundManager.playClick();
-                    }}
+                    onClick={handleTogglePlay}
                     className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition shadow-md cursor-pointer ${
-                      isPlayingAudio && !isAudioPaused
+                      isPlaying && !isPaused
                         ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black ring-2 ring-amber-400/30'
-                        : isPlayingAudio && isAudioPaused
+                        : isPlaying && isPaused
                         ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400/30 animate-pulse'
                         : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white shadow-emerald-500/20'
                     }`}
                   >
-                    {isPlayingAudio && !isAudioPaused ? (
+                    {isPlaying && !isPaused ? (
                       <>
                         <Pause className="w-4 h-4 fill-current text-slate-950" />
                         <span>Pausar Narración</span>
                       </>
-                    ) : isPlayingAudio && isAudioPaused ? (
+                    ) : isPlaying && isPaused ? (
                       <>
                         <Play className="w-4 h-4 fill-current text-slate-950" />
                         <span>Reanudar Narración</span>
@@ -204,12 +247,9 @@ export function ImmersionViewer({
                     )}
                   </button>
 
-                  {isPlayingAudio && (
+                  {isPlaying && (
                     <button
-                      onClick={() => {
-                        onStopAudio();
-                        soundManager.playClick();
-                      }}
+                      onClick={handleStop}
                       className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#0e1626] hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition cursor-pointer"
                       title="Detener audio completamente"
                     >
@@ -240,13 +280,30 @@ export function ImmersionViewer({
               </div>
             </div>
 
-            {/* Párrafos del Texto Comprensible */}
+            {/* Párrafos del Texto Comprensible con Resaltado Karaoke Sincronizado */}
             <div className="space-y-4 text-slate-200 leading-relaxed text-base font-normal">
-              {selectedStory.paragraphs.map((p, idx) => (
-                <p key={idx} className="p-3 rounded-2xl hover:bg-slate-900/40 transition duration-150 border border-transparent hover:border-slate-800">
-                  {p}
-                </p>
-              ))}
+              {selectedStory.paragraphs.map((p, pIdx) => {
+                const words = p.split(/\s+/).filter(Boolean);
+                return (
+                  <p key={pIdx} className="p-3.5 rounded-2xl hover:bg-slate-900/40 transition duration-150 border border-transparent hover:border-slate-800 leading-relaxed text-base md:text-lg">
+                    {words.map((w, wIdx) => {
+                      const isKaraokeActive = (isPlaying || isPaused) && karaokeWord?.paragraphIndex === pIdx && karaokeWord?.wordIndex === wIdx;
+                      return (
+                        <span
+                          key={wIdx}
+                          className={`transition-all duration-150 inline-block mr-1.5 ${
+                            isKaraokeActive
+                              ? 'bg-gradient-to-r from-emerald-400 to-teal-300 text-slate-950 font-black shadow-lg shadow-emerald-500/50 scale-105 rounded px-1.5 py-0.5 ring-2 ring-emerald-300 z-10'
+                              : ''
+                          }`}
+                        >
+                          {w}
+                        </span>
+                      );
+                    })}
+                  </p>
+                );
+              })}
             </div>
 
             {/* Spotlight de Vocabulario en Contexto */}

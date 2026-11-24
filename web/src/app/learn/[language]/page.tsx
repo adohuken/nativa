@@ -378,6 +378,10 @@ function FluentiaPathContent() {
   // Diálogo Continuo Paso 1
   const [isContinuousPlaying, setIsContinuousPlaying] = useState(false);
   const continuousStopRef = useRef<boolean>(false);
+  const pausedCharIndexRef = useRef<number>(0);
+  const currentUtteranceTextRef = useRef<string>('');
+  const currentUtterancePitchRef = useRef<number>(1.0);
+  const isAudioPausedRef = useRef<boolean>(false);
 
   // Paso 2 (Comprensión)
   const [step2SelectedIdx, setStep2SelectedIdx] = useState<number | null>(null);
@@ -721,43 +725,100 @@ function FluentiaPathContent() {
 
   const pauseAudio = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.pause();
+      isAudioPausedRef.current = true;
       setIsAudioPaused(true);
+      window.speechSynthesis.pause();
     }
   };
 
   const resumeAudio = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.resume();
+      isAudioPausedRef.current = false;
       setIsAudioPaused(false);
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      setTimeout(() => {
+        if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
+          if (currentUtteranceTextRef.current) {
+            speakTextFromChar(
+              currentUtteranceTextRef.current,
+              pausedCharIndexRef.current,
+              activeAudioIndex ?? undefined,
+              currentUtterancePitchRef.current
+            );
+          }
+        }
+      }, 180);
     }
+  };
+
+  const speakTextFromChar = (fullText: string, fromChar: number, lineIdx?: number, pitch: number = 1.0) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const textToSpeak = fromChar > 0 ? fullText.slice(fromChar) : fullText;
+    if (!textToSpeak.trim()) {
+      setIsPlayingAudio(false);
+      setIsAudioPaused(false);
+      setActiveAudioIndex(null);
+      pausedCharIndexRef.current = 0;
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    setIsPlayingAudio(true);
+    setIsAudioPaused(false);
+    isAudioPausedRef.current = false;
+    currentUtteranceTextRef.current = fullText;
+    currentUtterancePitchRef.current = pitch;
+    setActiveAudioIndex(lineIdx !== undefined ? lineIdx : 0);
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = 'en-US';
+    utterance.rate = audioSpeed;
+    utterance.pitch = pitch;
+
+    utterance.onboundary = (e) => {
+      if (isAudioPausedRef.current) return;
+      if (e.charIndex !== undefined) {
+        pausedCharIndexRef.current = fromChar + e.charIndex;
+      }
+    };
+
+    utterance.onend = () => {
+      if (isAudioPausedRef.current) return;
+      setIsPlayingAudio(false);
+      setIsAudioPaused(false);
+      setActiveAudioIndex(null);
+      pausedCharIndexRef.current = 0;
+      currentUtteranceTextRef.current = '';
+    };
+
+    utterance.onerror = (e) => {
+      if (isAudioPausedRef.current || (e as any)?.error === 'interrupted') return;
+      setIsPlayingAudio(false);
+      setIsAudioPaused(false);
+      setActiveAudioIndex(null);
+      pausedCharIndexRef.current = 0;
+    };
+
+    window.speechSynthesis.speak(utterance);
   };
 
   const speakText = (text: string, lineIdx?: number, pitch: number = 1.0) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    setIsPlayingAudio(true);
-    setIsAudioPaused(false);
-    setActiveAudioIndex(lineIdx !== undefined ? lineIdx : 0);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = audioSpeed;
-    utterance.pitch = pitch;
-    utterance.onend = () => {
-      setIsPlayingAudio(false);
-      setIsAudioPaused(false);
-      setActiveAudioIndex(null);
-    };
-    utterance.onerror = () => {
-      setIsPlayingAudio(false);
-      setIsAudioPaused(false);
-      setActiveAudioIndex(null);
-    };
-    window.speechSynthesis.speak(utterance);
+    if (isAudioPaused && currentUtteranceTextRef.current === text) {
+      resumeAudio();
+      return;
+    }
+    pausedCharIndexRef.current = 0;
+    speakTextFromChar(text, 0, lineIdx, pitch);
   };
 
   const stopContinuousDialogue = () => {
     continuousStopRef.current = true;
+    isAudioPausedRef.current = false;
+    pausedCharIndexRef.current = 0;
+    currentUtteranceTextRef.current = '';
     setIsContinuousPlaying(false);
     setIsPlayingAudio(false);
     setIsAudioPaused(false);
@@ -771,15 +832,21 @@ function FluentiaPathContent() {
     if (!activeLesson || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
     if (isContinuousPlaying) {
-      stopContinuousDialogue();
-      return;
+      if (isAudioPaused) {
+        resumeAudio();
+        return;
+      } else {
+        pauseAudio();
+        return;
+      }
     }
 
     continuousStopRef.current = false;
     setIsContinuousPlaying(true);
+    pausedCharIndexRef.current = 0;
     const lines = activeLesson.step1_dialogue.lines;
 
-    const playLineAt = (index: number) => {
+    const playLineAt = (index: number, fromChar: number = 0) => {
       if (continuousStopRef.current || index >= lines.length) {
         setIsContinuousPlaying(false);
         setActiveAudioIndex(null);
@@ -788,28 +855,41 @@ function FluentiaPathContent() {
 
       setActiveAudioIndex(index);
       const line = lines[index];
-      const utterance = new SpeechSynthesisUtterance(line.en);
+      const textToSpeak = fromChar > 0 ? line.en.slice(fromChar) : line.en;
+      currentUtteranceTextRef.current = line.en;
+
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
       utterance.lang = 'en-US';
       utterance.rate = audioSpeed;
 
-      // Variación de tono para distinguir al estudiante del interlocutor
       const isStudent = line.speaker.toLowerCase().includes('david') || line.speaker.toLowerCase().includes('learner');
       utterance.pitch = isStudent ? 1.08 : 0.94;
+      currentUtterancePitchRef.current = utterance.pitch;
+
+      utterance.onboundary = (e) => {
+        if (isAudioPausedRef.current) return;
+        if (e.charIndex !== undefined) {
+          pausedCharIndexRef.current = fromChar + e.charIndex;
+        }
+      };
 
       utterance.onend = () => {
+        if (isAudioPausedRef.current) return;
         if (continuousStopRef.current) {
           setIsContinuousPlaying(false);
           setActiveAudioIndex(null);
           return;
         }
+        pausedCharIndexRef.current = 0;
         setTimeout(() => {
-          if (!continuousStopRef.current) {
-            playLineAt(index + 1);
+          if (!continuousStopRef.current && !isAudioPausedRef.current) {
+            playLineAt(index + 1, 0);
           }
         }, 450);
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (e) => {
+        if (isAudioPausedRef.current || (e as any)?.error === 'interrupted') return;
         setIsContinuousPlaying(false);
         setActiveAudioIndex(null);
       };
@@ -818,7 +898,7 @@ function FluentiaPathContent() {
     };
 
     window.speechSynthesis.cancel();
-    playLineAt(0);
+    playLineAt(0, 0);
   };
 
   // Efecto para sincronizar baraja SRS dinámica según niveles y progreso
@@ -1695,44 +1775,42 @@ function FluentiaPathContent() {
           </div>
         </div>
 
-        {/* 1. Header Unificado: Perfil + Nivel + Bandera / Idioma + Menú de Cuenta + Stats */}
-        <div data-tour="tour-profile-stats" className="space-y-3">
+        {/* 1. Header Unificado: Perfil y Estadísticas Minimalista */}
+        <div data-tour="tour-profile-stats" className="space-y-2.5">
           <div className="relative" ref={accountMenuRef}>
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition shadow-xs">
-              {/* Avatar + Nombre + Nivel */}
-              <div className="flex items-center gap-2.5 min-w-0 text-left flex-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAccountMenuOpen(!isAccountMenuOpen);
-                    soundManager.playClick();
-                  }}
-                  className="flex items-center gap-2.5 min-w-0 text-left cursor-pointer flex-1 group"
-                  title="Opciones de cuenta y configuración"
-                >
-                  <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-800 border border-slate-700/80 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner group-hover:border-slate-600 transition">
-                    {userProfile.avatarUrl ? (
-                      <img src={userProfile.avatarUrl} alt={displayName} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-sm">{userProfile.avatarEmoji || '👨‍🎓'}</span>
-                    )}
-                  </div>
-                  <div className="overflow-hidden min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-white group-hover:text-emerald-300 block truncate transition">
-                        {displayName}
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono text-emerald-400/90 block truncate">
-                      {levelSubtitle}
-                    </span>
-                  </div>
-                </button>
+            {/* Fila 1: Avatar, Nombre/Nivel a la izquierda; Corona, Ajustes, Inicio a la derecha */}
+            <div className="flex items-center justify-between py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAccountMenuOpen(!isAccountMenuOpen);
+                  soundManager.playClick();
+                }}
+                className="flex items-center gap-2.5 min-w-0 text-left cursor-pointer group flex-1 mr-2"
+                title="Opciones de perfil y cuenta"
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700/60 flex items-center justify-center font-bold text-xs shrink-0 group-hover:border-emerald-500/50 transition">
+                  {userProfile.avatarUrl ? (
+                    <img src={userProfile.avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm">{userProfile.avatarEmoji || '👨‍🎓'}</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-bold text-white group-hover:text-emerald-300 block truncate transition">
+                    {displayName}
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-400 block truncate">
+                    {levelSubtitle}
+                  </span>
+                </div>
+              </button>
 
-                {/* Indicador / Botón de Premium */}
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Corona Premium */}
                 {isUserPremium ? (
-                  <span title="Nativa Premium Activo" className="inline-flex items-center p-1 rounded-md bg-amber-500/15 border border-amber-500/30">
-                    <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                  <span title="Nativa Premium Activo" className="p-1.5 text-amber-400">
+                    <Crown className="w-4 h-4 fill-amber-400" />
                   </span>
                 ) : (
                   <button
@@ -1743,47 +1821,37 @@ function FluentiaPathContent() {
                       soundManager.playClick();
                     }}
                     title="Obtener Nativa Premium (B1-C2)"
-                    className="p-1 rounded-md hover:bg-slate-800 text-amber-400/80 hover:text-amber-300 hover:scale-105 transition shrink-0 cursor-pointer"
+                    className="p-1.5 text-amber-400/80 hover:text-amber-300 hover:scale-105 transition cursor-pointer"
                   >
-                    <Crown className="w-3.5 h-3.5" />
+                    <Crown className="w-4 h-4" />
                   </button>
                 )}
-              </div>
 
-              {/* Botón Ayuda Tour + Bandera / Hub + Botón Ajustes */}
-              <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsTourOpen(true);
-                    soundManager.playClick();
-                  }}
-                  className="p-1.5 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-emerald-300 hover:bg-slate-800 transition cursor-pointer"
-                  title="Ver Tutorial Interactivo (Tour de Bienvenida)"
-                >
-                  <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
-                </button>
-                <span
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300 select-none"
-                  title={`Idioma Activo: ${currentLanguageEntry.name}`}
-                >
-                  <span className="text-sm leading-none">{currentLanguageEntry.flag}</span>
-                </span>
+                {/* Engranaje de Ajustes */}
                 <button
                   onClick={() => {
                     setIsAccountMenuOpen(!isAccountMenuOpen);
                     soundManager.playClick();
                   }}
-                  className={`p-1.5 rounded-lg border transition cursor-pointer ${isAccountMenuOpen ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'}`}
-                  title="Menú de Cuenta y Ajustes"
+                  className={`p-1.5 rounded-lg transition cursor-pointer ${isAccountMenuOpen ? 'text-white bg-slate-800' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+                  title="Ajustes y Cuenta"
                   aria-expanded={isAccountMenuOpen}
                 >
-                  <Settings className="w-3.5 h-3.5" />
+                  <Settings className="w-4 h-4" />
                 </button>
+
+                {/* Ícono de Casita (Inicio / Landing) */}
+                <Link
+                  href="/"
+                  className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-lg transition"
+                  title="Ir al Inicio Público (Landing Page)"
+                >
+                  <Home className="w-4 h-4" />
+                </Link>
               </div>
             </div>
 
-            {/* 2. Dropdown de Acciones Secundarias (Test Nivelación, Premium, Certificados, Perfil, Salir) */}
+            {/* Dropdown de Acciones de Cuenta */}
             <AnimatePresence>
               {isAccountMenuOpen && (
                 <motion.div
@@ -1934,8 +2002,8 @@ function FluentiaPathContent() {
             </AnimatePresence>
           </div>
 
-          {/* 3. Métricas Rápidas: Barra horizontal sobria y minimalista */}
-          <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#090d18] border border-slate-800/80 text-xs font-mono select-none">
+          {/* Fila 2: Métricas Rápidas sin cajas pesadas */}
+          <div className="flex items-center justify-between py-1 px-1 text-xs font-mono select-none">
             <div className="flex items-center gap-1.5 text-amber-400" title="Racha de estudio diario">
               <Flame className="w-3.5 h-3.5 fill-current" />
               <span className="font-extrabold">{streakDays}d racha</span>
@@ -1953,119 +2021,9 @@ function FluentiaPathContent() {
           </div>
         </div>
 
-        {/* 4. Rutina Diaria Ejecutiva: Objetivos Interactivos Profesionales */}
-        <div data-tour="tour-daily-practice" className="p-3 rounded-2xl bg-[#090e1b] border border-slate-800/90 shadow-sm space-y-2.5">
-          {/* Header con progreso del día */}
-          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
-            <div className="flex items-center gap-1.5">
-              <Target className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] font-bold text-slate-200 tracking-tight">
-                Práctica Diaria
-              </span>
-            </div>
-            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-              {dailyMissionsState.missions.filter(m => m.completed).length}/3 Completados
-            </span>
-          </div>
-
-          {/* Micro-barra de progreso sutil */}
-          <div className="w-full h-1 bg-slate-800/80 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 transition-all duration-500 rounded-full"
-              style={{
-                width: `${Math.round((dailyMissionsState.missions.filter(m => m.completed).length / (dailyMissionsState.missions.length || 3)) * 100)}%`
-              }}
-            />
-          </div>
-
-          {/* 3 Tareas Diarias Interactivas en formato Fila Limpia */}
-          <div className="space-y-1.5 pt-0.5">
-            {/* Tarea 1: Vocabulario del Día (The Daily Drop) */}
-            <div
-              onClick={() => {
-                setIsDailyVocabOpen(true);
-                soundManager.playClick();
-              }}
-              className="group p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/70 hover:border-emerald-500/40 transition flex items-center justify-between gap-2 cursor-pointer shadow-xs"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-lg bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400 group-hover:scale-105 transition-transform">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-emerald-300 transition truncate leading-none">
-                    3 Términos de Hoy
-                  </p>
-                  <p className="text-[9px] text-slate-400 truncate mt-0.5">
-                    Adquisición léxica diaria
-                  </p>
-                </div>
-              </div>
-              <span className="shrink-0 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20 group-hover:border-emerald-500/40 transition">
-                +15 XP
-              </span>
-            </div>
-
-            {/* Tarea 2: Sesión de Repaso SRS */}
-            <div
-              onClick={() => {
-                setCurrentView('REVIEW');
-                soundManager.playClick();
-              }}
-              className="group p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/70 hover:border-cyan-500/40 transition flex items-center justify-between gap-2 cursor-pointer shadow-xs"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-lg bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center shrink-0 text-cyan-400 group-hover:scale-105 transition-transform">
-                  <Brain className="w-3.5 h-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-cyan-300 transition truncate leading-none">
-                    Repaso Espaciado (SRS)
-                  </p>
-                  <p className="text-[9px] text-slate-400 truncate mt-0.5">
-                    Fijar tarjetas en memoria
-                  </p>
-                </div>
-              </div>
-              <span className="shrink-0 text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20 group-hover:border-cyan-500/40 transition">
-                +20 XP
-              </span>
-            </div>
-
-            {/* Tarea 3: Inmersión Auditiva */}
-            <div
-              onClick={() => {
-                setCurrentView('IMMERSION');
-                soundManager.playClick();
-              }}
-              className="group p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/70 hover:border-amber-500/40 transition flex items-center justify-between gap-2 cursor-pointer shadow-xs"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-lg bg-amber-950/60 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 group-hover:scale-105 transition-transform">
-                  <Headphones className="w-3.5 h-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-amber-300 transition truncate leading-none">
-                    Inmersión Auditiva
-                  </p>
-                  <p className="text-[9px] text-slate-400 truncate mt-0.5">
-                    Input comprensible i+1
-                  </p>
-                </div>
-              </div>
-              <span className="shrink-0 text-[10px] font-mono font-bold text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-500/20 group-hover:border-amber-500/40 transition">
-                +20 XP
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 5. Selector de Vista Principal: 5 Modos con estilo sutil gamer */}
+        {/* 2. Modos de Vista: Situados inmediatamente bajo las estadísticas */}
         <div className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block px-1">
-            Modos de Vista
-          </span>
-          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-900/60 rounded-xl border border-slate-800/80 text-xs shadow-inner">
+          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-900/50 rounded-xl text-xs">
             {[
               { id: 'PATH', label: 'Ruta', icon: MapPin },
               { id: 'IMMERSION', label: 'Inmersión', icon: BookOpen },
@@ -2083,17 +2041,119 @@ function FluentiaPathContent() {
                     setIsMobileDrawerOpen(false);
                     soundManager.playClick();
                   }}
-                  className={`py-1.5 px-1 rounded-lg font-bold transition flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                  className={`py-2 px-1 rounded-lg font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
                     isActive
-                      ? 'bg-slate-800 text-white font-black shadow-xs border border-slate-700/80'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      ? 'bg-emerald-500/15 text-emerald-300 font-extrabold shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
                   }`}
+                  title={tab.label}
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span className="text-[9px]">{tab.label}</span>
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                  <span className="text-[10px]">{tab.label}</span>
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* 3. Práctica Diaria (Misiones): Lista limpia sin cajas pesadas */}
+        <div data-tour="tour-daily-practice" className="space-y-2">
+          {/* Header con progreso del día */}
+          <div className="flex items-center justify-between pb-1">
+            <div className="flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-xs font-bold text-slate-200 tracking-tight">
+                Práctica Diaria
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-emerald-400">
+              {dailyMissionsState.missions.filter(m => m.completed).length}/3 Completados
+            </span>
+          </div>
+
+          {/* Micro-barra de progreso sutil */}
+          <div className="w-full h-1 bg-slate-800/60 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 transition-all duration-500 rounded-full"
+              style={{
+                width: `${Math.round((dailyMissionsState.missions.filter(m => m.completed).length / (dailyMissionsState.missions.length || 3)) * 100)}%`
+              }}
+            />
+          </div>
+
+          {/* 3 Tareas en Lista Limpia */}
+          <div className="space-y-1 pt-0.5">
+            {/* Tarea 1: Vocabulario del Día */}
+            <div
+              onClick={() => {
+                setIsDailyVocabOpen(true);
+                soundManager.playClick();
+              }}
+              className="group py-1.5 px-2 rounded-xl hover:bg-slate-800/40 transition flex items-center justify-between gap-2 cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-200 group-hover:text-emerald-300 transition truncate leading-none">
+                    3 Términos de Hoy
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    Adquisición léxica diaria
+                  </p>
+                </div>
+              </div>
+              <span className="shrink-0 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-md">
+                +15 XP
+              </span>
+            </div>
+
+            {/* Tarea 2: Sesión de Repaso SRS */}
+            <div
+              onClick={() => {
+                setCurrentView('REVIEW');
+                soundManager.playClick();
+              }}
+              className="group py-1.5 px-2 rounded-xl hover:bg-slate-800/40 transition flex items-center justify-between gap-2 cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Brain className="w-4 h-4 text-cyan-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-200 group-hover:text-cyan-300 transition truncate leading-none">
+                    Repaso Espaciado (SRS)
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    Fijar tarjetas en memoria
+                  </p>
+                </div>
+              </div>
+              <span className="shrink-0 text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded-md">
+                +20 XP
+              </span>
+            </div>
+
+            {/* Tarea 3: Inmersión Auditiva */}
+            <div
+              onClick={() => {
+                setCurrentView('IMMERSION');
+                soundManager.playClick();
+              }}
+              className="group py-1.5 px-2 rounded-xl hover:bg-slate-800/40 transition flex items-center justify-between gap-2 cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Headphones className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-200 group-hover:text-amber-300 transition truncate leading-none">
+                    Inmersión Auditiva
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    Input comprensible i+1
+                  </p>
+                </div>
+              </div>
+              <span className="shrink-0 text-[10px] font-mono font-bold text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded-md">
+                +20 XP
+              </span>
+            </div>
           </div>
         </div>
 

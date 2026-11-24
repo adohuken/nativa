@@ -38,6 +38,7 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [audioSpeed, setAudioSpeed] = useState<number>(1.0);
   const [activeAudioIndex, setActiveAudioIndex] = useState<number | null>(null);
+  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
   const [isAudioSpeaking, setIsAudioSpeaking] = useState<boolean>(false);
   const [isAudioPaused, setIsAudioPaused] = useState<boolean>(false);
   const [isContinuousPlaying, setIsContinuousPlaying] = useState<boolean>(false);
@@ -46,6 +47,13 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
   const continuousStopRef = useRef<boolean>(false);
   const currentLineRef = useRef<number>(0);
   const audioSpeedRef = useRef<number>(1.0);
+  const pausedCharIndexRef = useRef<number>(0);
+  const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const currentSpeakingTextRef = useRef<string>('');
+  const currentSpeakingLineIdxRef = useRef<number | null>(null);
+  const currentSpeakingPitchRef = useRef<number>(1.0);
+  const isAudioPausedRef = useRef<boolean>(false);
+  const resumeWatchdogRef = useRef<any>(null);
   const [revealedLineIndexes, setRevealedLineIndexes] = useState<number[]>([]);
   const [showTranslations, setShowTranslations] = useState<boolean>(false);
 
@@ -92,44 +100,74 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
   const handleToggleStarPhrase = onToggleStarPhrase;
 
   // ==========================================
-  // CONTROL MAESTRO DE SÍNTESIS DE VOZ Y AUDIO
+  // CONTROL MAESTRO DE SÍNTESIS DE VOZ Y AUDIO (PAUSA, REANUDACIÓN Y KARAOKE)
   // ==========================================
   const pauseAudio = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.pause();
+      isAudioPausedRef.current = true;
       setIsAudioPaused(true);
       if (isContinuousPlaying) {
         setIsContinuousPaused(true);
       }
+      if (resumeWatchdogRef.current) {
+        clearTimeout(resumeWatchdogRef.current);
+        resumeWatchdogRef.current = null;
+      }
+      window.speechSynthesis.pause();
     }
   };
 
   const resumeAudio = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      isAudioPausedRef.current = false;
+      setIsAudioPaused(false);
+      if (isContinuousPlaying) {
+        setIsContinuousPaused(false);
+      }
+
+      // 1. Intentar reanudar nativamente
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
-        setIsAudioPaused(false);
-        if (isContinuousPlaying) {
-          setIsContinuousPaused(false);
-        }
-      } else {
-        // En caso de que el navegador pierda el estado paused, reanudar limpiamente
-        setIsAudioPaused(false);
-        if (isContinuousPlaying) {
-          setIsContinuousPaused(false);
-          playLineAt(currentLineRef.current);
-        }
       }
+
+      // 2. Watchdog de seguridad (Chromium bug workaround):
+      // Si después de 180ms el motor del navegador sigue en pausa o no está hablando,
+      // reanudar hablando exactamente el fragmento de texto restante desde pausedCharIndexRef.current
+      if (resumeWatchdogRef.current) clearTimeout(resumeWatchdogRef.current);
+      resumeWatchdogRef.current = setTimeout(() => {
+        if (!isAudioPausedRef.current && (!window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
+          if (isContinuousPlaying && currentLineRef.current !== null) {
+            playLineAt(currentLineRef.current, pausedCharIndexRef.current);
+          } else if (currentSpeakingTextRef.current) {
+            speakTextFromChar(
+              currentSpeakingTextRef.current,
+              pausedCharIndexRef.current,
+              currentSpeakingLineIdxRef.current,
+              currentSpeakingPitchRef.current
+            );
+          }
+        }
+      }, 180);
     }
   };
 
   const stopAllAudio = () => {
     continuousStopRef.current = true;
+    isAudioPausedRef.current = false;
+    pausedCharIndexRef.current = 0;
+    currentSpeakingTextRef.current = '';
+    currentSpeakingLineIdxRef.current = null;
+    currentUtteranceRef.current = null;
+    if (resumeWatchdogRef.current) {
+      clearTimeout(resumeWatchdogRef.current);
+      resumeWatchdogRef.current = null;
+    }
     setIsContinuousPlaying(false);
     setIsContinuousPaused(false);
     setIsAudioSpeaking(false);
     setIsAudioPaused(false);
     setActiveAudioIndex(null);
+    setActiveWordIndex(null);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -137,29 +175,85 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
 
   const stopContinuousDialogue = stopAllAudio;
 
-  const speakText = (text: string, lineIdx?: number, pitch: number = 1.0) => {
+  const speakTextFromChar = (
+    fullText: string,
+    fromChar: number,
+    lineIdx?: number | null,
+    pitch: number = 1.0
+  ) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const safeFrom = Math.max(0, Math.min(fromChar, fullText.length));
+    const textToSpeak = safeFrom > 0 ? fullText.slice(safeFrom) : fullText;
+    if (!textToSpeak.trim()) {
+      setIsAudioSpeaking(false);
+      setIsAudioPaused(false);
+      setActiveAudioIndex(null);
+      setActiveWordIndex(null);
+      pausedCharIndexRef.current = 0;
+      return;
+    }
+
     window.speechSynthesis.cancel();
-    if (lineIdx !== undefined) setActiveAudioIndex(lineIdx);
+    if (lineIdx !== undefined && lineIdx !== null) setActiveAudioIndex(lineIdx);
     setIsAudioSpeaking(true);
     setIsAudioPaused(false);
+    isAudioPausedRef.current = false;
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    currentSpeakingTextRef.current = fullText;
+    currentSpeakingLineIdxRef.current = lineIdx ?? null;
+    currentSpeakingPitchRef.current = pitch;
+    pausedCharIndexRef.current = safeFrom;
+
+    // Localizar palabra activa inicial
+    const wordsBefore = fullText.slice(0, safeFrom).trim().split(/\s+/).filter(Boolean);
+    setActiveWordIndex(wordsBefore.length);
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'en-US';
     utterance.rate = audioSpeedRef.current;
     utterance.pitch = pitch;
+    currentUtteranceRef.current = utterance;
+
+    utterance.onboundary = (event: SpeechSynthesisEvent) => {
+      if (isAudioPausedRef.current) return;
+      const relChar = event.charIndex !== undefined ? event.charIndex : 0;
+      const absChar = safeFrom + relChar;
+      pausedCharIndexRef.current = absChar;
+
+      const wordsUpToNow = fullText.slice(0, absChar).trim().split(/\s+/).filter(Boolean);
+      setActiveWordIndex(wordsUpToNow.length);
+    };
 
     utterance.onend = () => {
+      if (isAudioPausedRef.current) return;
       setIsAudioSpeaking(false);
       setIsAudioPaused(false);
       setActiveAudioIndex(null);
+      setActiveWordIndex(null);
+      pausedCharIndexRef.current = 0;
+      currentSpeakingTextRef.current = '';
     };
-    utterance.onerror = () => {
+
+    utterance.onerror = (e) => {
+      if (isAudioPausedRef.current || (e as any)?.error === 'interrupted') return;
       setIsAudioSpeaking(false);
       setIsAudioPaused(false);
       setActiveAudioIndex(null);
+      setActiveWordIndex(null);
+      pausedCharIndexRef.current = 0;
     };
+
     window.speechSynthesis.speak(utterance);
+  };
+
+  const speakText = (text: string, lineIdx?: number, pitch: number = 1.0) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (isAudioPaused && currentSpeakingTextRef.current === text) {
+      resumeAudio();
+      return;
+    }
+    pausedCharIndexRef.current = 0;
+    speakTextFromChar(text, 0, lineIdx, pitch);
   };
 
   const toggleSpeakLine = (line: { en: string; speaker: string }, idx: number) => {
@@ -167,7 +261,7 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
       stopAllAudio();
     }
 
-    if (activeAudioIndex === idx && isAudioSpeaking) {
+    if (activeAudioIndex === idx && (isAudioSpeaking || isAudioPaused)) {
       if (!isAudioPaused) {
         pauseAudio();
       } else {
@@ -176,17 +270,19 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
       return;
     }
 
+    pausedCharIndexRef.current = 0;
     const isStudent = line.speaker.toLowerCase().includes('david') || line.speaker.toLowerCase().includes('learner') || line.speaker.toLowerCase().includes('candidate');
-    speakText(line.en, idx, isStudent ? 1.08 : 0.94);
+    speakTextFromChar(line.en, 0, idx, isStudent ? 1.08 : 0.94);
   };
 
-  const playLineAt = (index: number) => {
+  const playLineAt = (index: number, fromChar: number = 0) => {
     const lines = lesson.step1_dialogue.lines;
     if (continuousStopRef.current || index >= lines.length) {
       setIsContinuousPlaying(false);
       setIsContinuousPaused(false);
       setIsAudioSpeaking(false);
       setActiveAudioIndex(null);
+      setActiveWordIndex(null);
       return;
     }
 
@@ -194,34 +290,63 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
     setActiveAudioIndex(index);
     setIsAudioSpeaking(true);
     setIsAudioPaused(false);
+    isAudioPausedRef.current = false;
 
     const line = lines[index];
-    const utterance = new SpeechSynthesisUtterance(line.en);
+    const safeFrom = Math.max(0, Math.min(fromChar, line.en.length));
+    const textToSpeak = safeFrom > 0 ? line.en.slice(safeFrom) : line.en;
+    currentSpeakingTextRef.current = line.en;
+    currentSpeakingLineIdxRef.current = index;
+    pausedCharIndexRef.current = safeFrom;
+
+    const wordsBefore = line.en.slice(0, safeFrom).trim().split(/\s+/).filter(Boolean);
+    setActiveWordIndex(wordsBefore.length);
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'en-US';
     utterance.rate = audioSpeedRef.current;
     const isStudent = line.speaker.toLowerCase().includes('david') || line.speaker.toLowerCase().includes('learner') || line.speaker.toLowerCase().includes('candidate');
     utterance.pitch = isStudent ? 1.08 : 0.94;
+    currentSpeakingPitchRef.current = utterance.pitch;
+    currentUtteranceRef.current = utterance;
+
+    utterance.onboundary = (event: SpeechSynthesisEvent) => {
+      if (isAudioPausedRef.current) return;
+      const relChar = event.charIndex !== undefined ? event.charIndex : 0;
+      const absChar = safeFrom + relChar;
+      pausedCharIndexRef.current = absChar;
+
+      const wordsUpToNow = line.en.slice(0, absChar).trim().split(/\s+/).filter(Boolean);
+      setActiveWordIndex(wordsUpToNow.length);
+    };
 
     utterance.onend = () => {
+      if (isAudioPausedRef.current) return;
       if (continuousStopRef.current) {
         setIsContinuousPlaying(false);
         setIsContinuousPaused(false);
         setIsAudioSpeaking(false);
         setActiveAudioIndex(null);
+        setActiveWordIndex(null);
         return;
       }
+      pausedCharIndexRef.current = 0;
       setTimeout(() => {
-        if (!continuousStopRef.current && !isContinuousPaused) {
-          playLineAt(index + 1);
+        if (!continuousStopRef.current && !isAudioPausedRef.current) {
+          playLineAt(index + 1, 0);
         }
       }, 450);
     };
 
-    utterance.onerror = () => {
+    utterance.onerror = (e) => {
+      if (isAudioPausedRef.current || (e as any)?.error === 'interrupted') return;
       setIsContinuousPlaying(false);
       setIsContinuousPaused(false);
       setIsAudioSpeaking(false);
       setActiveAudioIndex(null);
+      setActiveWordIndex(null);
+      pausedCharIndexRef.current = 0;
     };
 
     window.speechSynthesis.speak(utterance);
@@ -230,7 +355,7 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
   const playContinuousDialogue = () => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     if (isContinuousPlaying) {
-      if (isContinuousPaused) {
+      if (isContinuousPaused || isAudioPaused) {
         resumeAudio();
       } else {
         pauseAudio();
@@ -243,17 +368,23 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
     setIsContinuousPlaying(true);
     setIsContinuousPaused(false);
     currentLineRef.current = 0;
-    playLineAt(0);
+    pausedCharIndexRef.current = 0;
+    playLineAt(0, 0);
   };
 
   const handleSpeedChange = (speed: number) => {
     setAudioSpeed(speed);
     audioSpeedRef.current = speed;
     soundManager.playClick();
-    // Si hay audio activo en una línea o diálogo, actualizarlo de inmediato
     if (isContinuousPlaying && !isContinuousPaused && activeAudioIndex !== null) {
-      window.speechSynthesis.cancel();
-      playLineAt(currentLineRef.current);
+      playLineAt(currentLineRef.current, pausedCharIndexRef.current);
+    } else if (isAudioSpeaking && !isAudioPaused && currentSpeakingTextRef.current) {
+      speakTextFromChar(
+        currentSpeakingTextRef.current,
+        pausedCharIndexRef.current,
+        currentSpeakingLineIdxRef.current,
+        currentSpeakingPitchRef.current
+      );
     }
   };
 
@@ -737,9 +868,27 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
                           </div>
                         </div>
 
-                        {/* Texto en Inglés (Tipografía Limpia y Grande) */}
+                        {/* Texto en Inglés (Tipografía Limpia y Grande con Resaltado Karaoke Sincronizado) */}
                         <p className="text-base text-white font-semibold leading-relaxed">
-                          {line.en}
+                          {isPlayingThisLine ? (
+                            line.en.split(/\s+/).filter(Boolean).map((word, wIdx) => {
+                              const isWordActive = activeWordIndex === wIdx;
+                              return (
+                                <span
+                                  key={wIdx}
+                                  className={`transition-all duration-150 inline-block mr-1.5 ${
+                                    isWordActive
+                                      ? 'bg-gradient-to-r from-emerald-400 to-teal-300 text-slate-950 font-black shadow-md rounded px-1.5 py-0.5 scale-105 ring-2 ring-emerald-300'
+                                      : ''
+                                  }`}
+                                >
+                                  {word}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            line.en
+                          )}
                         </p>
 
                         {/* Apoyo Fonético Opcional (solo visible si el usuario activa el botón de ayuda) */}
