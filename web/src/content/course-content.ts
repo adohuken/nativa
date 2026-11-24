@@ -2099,3 +2099,22 @@ export function getAllLanguages(): Record<string, LanguageHubEntry> {
   }
   return merged;
 }
+
+/**
+ * Obtiene la ruta de destino tras iniciar sesión.
+ * Si el usuario solo tiene un idioma activo (por defecto Inglés), redirige directo a su ruta (/learn/english).
+ * Si en el futuro activa múltiples idiomas, se redirige al /dashboard como Hub de Idiomas.
+ */
+export function getPostLoginRedirectUrl(): string {
+  try {
+    const all = getAllLanguages();
+    const activeLanguages = Object.values(all).filter(lang => lang.status === 'active');
+    if (activeLanguages.length > 1) {
+      return '/dashboard';
+    }
+    const target = activeLanguages[0]?.id || 'english';
+    return `/learn/${target}`;
+  } catch {
+    return '/learn/english';
+  }
+}

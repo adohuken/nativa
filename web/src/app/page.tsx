@@ -182,14 +182,14 @@ export default function PublicLandingPage() {
           </button>
 
           {isAuthenticated ? (
-            /* USUARIO CONECTADO -> BOTÓN DIRECTO AL DASHBOARD */
+            /* USUARIO CONECTADO -> BOTÓN DIRECTO A LA RUTA */
             <Link
-              href="/dashboard"
+              href="/learn/english"
               onClick={() => soundManager.playClick()}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs sm:text-sm transition shadow-lg shadow-emerald-500/20 flex items-center gap-2 border border-emerald-300/40 cursor-pointer"
             >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Ir a mi Panel ({studentName})</span>
+              <Play className="w-4 h-4 fill-slate-950 text-slate-950" />
+              <span>Continuar mi Ruta ({studentName})</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           ) : (
@@ -241,12 +241,12 @@ export default function PublicLandingPage() {
         <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
           {isAuthenticated ? (
             <Link
-              href="/dashboard"
+              href="/learn/english"
               onClick={() => soundManager.playClick()}
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:brightness-110 active:scale-95 text-slate-950 font-black text-base transition shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-3 group border border-emerald-300/40 cursor-pointer"
             >
               <Play className="w-5 h-5 fill-slate-950 text-slate-950" />
-              <span>Continuar en mi Panel de Estudio</span>
+              <span>Continuar mi Ruta de Aprendizaje</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
             </Link>
           ) : (
@@ -763,8 +763,8 @@ export default function PublicLandingPage() {
             <a href="#tracks" className="hover:text-slate-300 transition">Tracks</a>
             <a href="#precios" className="hover:text-slate-300 transition">Precios</a>
             {isAuthenticated && (
-              <Link href="/dashboard" className="text-emerald-400 font-bold hover:underline">
-                Mi Panel de Estudio
+              <Link href="/learn/english" className="text-emerald-400 font-bold hover:underline">
+                Mi Ruta de Aprendizaje
               </Link>
             )}
             <Link href="/admin" className="text-slate-600 hover:text-slate-400 transition" title="Portal de Administración">

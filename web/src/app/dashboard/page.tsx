@@ -32,7 +32,8 @@ import {
   LogOut,
   User,
   ArrowLeft,
-  HelpCircle
+  HelpCircle,
+  Home
 } from 'lucide-react';
 import { FluentiaLogo, NativaLogo } from '@/components/fluentia-logo';
 import { LANGUAGES_REGISTRY, LanguageHubEntry, getAllLanguages } from '@/content/course-content';
@@ -66,6 +67,7 @@ export default function StudentDashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
   const [missionsState, setMissionsState] = useState<DailyMissionsState>(() => AppStorage.getDailyMissions());
+  const [isRedirectingToRoute, setIsRedirectingToRoute] = useState<boolean>(true);
 
   // Nombre Real del Alumno (evitar "Estudiante" y correos electrónicos)
   const displayName = useMemo(() => {
@@ -93,7 +95,16 @@ export default function StudentDashboardPage() {
     const savedSound = AppStorage.getSoundEnabled();
     const currentLang = AppStorage.getActiveLanguage();
     const allLangs = getAllLanguages();
+    const activeLanguages = Object.values(allLangs).filter(l => l.status === 'active');
 
+    // Si solo hay un idioma activo (por defecto Inglés), redirigir inmediatamente a su ruta (/learn/english)
+    if (activeLanguages.length <= 1) {
+      const targetLang = activeLanguages[0]?.id || 'english';
+      router.replace(`/learn/${targetLang}`);
+      return;
+    }
+
+    setIsRedirectingToRoute(false);
     setSoundEnabled(savedSound);
     setActiveLang(currentLang || 'english');
     setLanguages(allLangs);
@@ -223,6 +234,15 @@ export default function StudentDashboardPage() {
 
   const englishProgressPct = Math.min(100, Math.round((completedEnglishNodes.length / 24) * 100));
 
+  if (isRedirectingToRoute) {
+    return (
+      <div className="min-h-screen bg-[#070b14] text-white flex flex-col items-center justify-center space-y-4 font-sans">
+        <div className="w-10 h-10 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        <p className="font-mono text-sm text-slate-300">Cargando tu ruta de aprendizaje en Nativa...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#040711] text-slate-100 flex flex-col selection:bg-emerald-500/30 selection:text-emerald-300 relative overflow-x-hidden">
       
@@ -239,7 +259,7 @@ export default function StudentDashboardPage() {
       ===================================================================== */}
       <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#070b14]/90 backdrop-blur-xl px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2" title="Ir al Inicio">
             <FluentiaLogo size="md" />
           </Link>
           <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-[11px] font-mono font-bold text-emerald-300">
@@ -254,11 +274,11 @@ export default function StudentDashboardPage() {
           <Link
             href="/"
             onClick={() => soundManager.playClick()}
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-medium transition"
-            title="Ir a la página principal pública"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-medium transition"
+            title="Ir a la página de inicio"
           >
-            <Globe2 className="w-3.5 h-3.5" />
-            <span>Inicio Web</span>
+            <Home className="w-3.5 h-3.5 text-slate-400" />
+            <span className="hidden sm:inline">Inicio</span>
           </Link>
 
           {/* Stats Gamer (Racha | XP | Tiempo) */}

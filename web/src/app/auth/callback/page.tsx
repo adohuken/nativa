@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabaseClient } from '@/lib/supabase';
 import { AppStorage } from '@/lib/storage';
+import { getPostLoginRedirectUrl } from '@/content/course-content';
 import { Loader2 } from 'lucide-react';
 
 export default function AuthCallbackPage() {
@@ -36,7 +37,7 @@ export default function AuthCallbackPage() {
       } catch (err) {
         console.error('Error handling auth callback:', err);
       } finally {
-        router.replace('/dashboard');
+        router.replace(getPostLoginRedirectUrl());
       }
     };
     processAuth();

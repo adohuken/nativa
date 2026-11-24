@@ -70,7 +70,8 @@ import {
   Crown,
   Gift,
   Settings,
-  ChevronDown
+  ChevronDown,
+  Home
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -294,11 +295,8 @@ function FluentiaPathContent() {
   const [isPaywallActive, setIsPaywallActive] = useState<boolean>(() => AppStorage.getPaywallEnabled());
   const [userProfile, setUserProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
   const isAdminUser = useMemo(() => {
-    return AppStorage.isAdmin() || Boolean(
-      userProfile?.isAdmin ||
-      userProfile?.email?.toLowerCase().includes('adohuken') ||
-      userProfile?.username?.toLowerCase().includes('adohuken')
-    );
+    // Modo evaluador estricto: solo activo si el usuario es administrador comprobado (is_admin = true)
+    return AppStorage.isAdmin();
   }, [userProfile]);
   const [dailyMissionsState, setDailyMissionsState] = useState<DailyMissionsState>(() => AppStorage.getDailyMissions());
 
@@ -1615,7 +1613,7 @@ function FluentiaPathContent() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2" title="Ir al Inicio">
             <FluentiaGlyph size="xs" />
             <span className="font-outfit font-black text-lg tracking-wider bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
               {APP_NAME.toUpperCase()}
@@ -1623,10 +1621,20 @@ function FluentiaPathContent() {
             <span className="text-[10px] font-mono text-emerald-300 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 font-bold">
               {userHighestLevel}
             </span>
-          </div>
+          </Link>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Botón Home Móvil */}
+          <Link
+            href="/"
+            onClick={() => soundManager.playClick()}
+            title="Ir a Página de Inicio"
+            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition"
+          >
+            <Home className="w-3.5 h-3.5" />
+          </Link>
+
           {/* Botón de Ayuda Móvil: Inicia Onboarding Tour */}
           <button
             onClick={() => {
@@ -1663,15 +1671,28 @@ function FluentiaPathContent() {
 
         {/* Brand & Botón Cerrar en Móvil */}
         <div className="flex items-center justify-between">
-          <FluentiaLogo size="md" />
+          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition group" title="Ir a la Página Principal (Inicio)">
+            <FluentiaLogo size="md" />
+          </Link>
 
-          <button
-            onClick={() => setIsMobileDrawerOpen(false)}
-            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-900 border border-slate-800"
-            aria-label="Cerrar menú"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/"
+              onClick={() => soundManager.playClick()}
+              className="p-1.5 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Ir a la Página de Inicio"
+            >
+              <Home className="w-4 h-4 text-slate-400 hover:text-emerald-400" />
+            </Link>
+
+            <button
+              onClick={() => setIsMobileDrawerOpen(false)}
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-900 border border-slate-800"
+              aria-label="Cerrar menú"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* 1. Header Unificado: Perfil + Nivel + Bandera / Idioma + Menú de Cuenta + Stats */}
@@ -1742,14 +1763,12 @@ function FluentiaPathContent() {
                 >
                   <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
                 </button>
-                <Link
-                  href="/dashboard"
-                  onClick={() => soundManager.playClick()}
-                  className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition"
-                  title={`Volver a Mi Panel de Estudio (Idioma: ${currentLanguageEntry.name})`}
+                <span
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300 select-none"
+                  title={`Idioma Activo: ${currentLanguageEntry.name}`}
                 >
                   <span className="text-sm leading-none">{currentLanguageEntry.flag}</span>
-                </Link>
+                </span>
                 <button
                   onClick={() => {
                     setIsAccountMenuOpen(!isAccountMenuOpen);
@@ -1846,7 +1865,7 @@ function FluentiaPathContent() {
                   </button>
 
                   <Link
-                    href="/dashboard"
+                    href="/"
                     onClick={() => {
                       setIsAccountMenuOpen(false);
                       soundManager.playClick();
@@ -1854,11 +1873,11 @@ function FluentiaPathContent() {
                     className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition text-left"
                   >
                     <div className="flex items-center gap-2">
-                      <Compass className="w-3.5 h-3.5 text-teal-400" />
-                      <span>Panel de Estudio</span>
+                      <Home className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Página de Inicio</span>
                     </div>
-                    <span className="text-[9px] font-mono bg-teal-950/60 border border-teal-500/30 text-teal-300 px-1.5 py-0.5 rounded font-bold">
-                      Dashboard
+                    <span className="text-[9px] font-mono bg-slate-800 border border-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-bold">
+                      Web
                     </span>
                   </Link>
 

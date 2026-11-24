@@ -23,6 +23,7 @@ import { getSupabaseClient, isSupabaseConfigured, DatabaseProfile } from '@/lib/
 import { AppStorage } from '@/lib/storage';
 import { soundManager } from '@/lib/sound-effects';
 import { NativaLogo } from '@/components/fluentia-logo';
+import { getPostLoginRedirectUrl } from '@/content/course-content';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -126,7 +127,7 @@ export function AuthModal({
         setTimeout(() => {
           onClose();
           if (typeof window !== 'undefined') {
-            window.location.href = '/dashboard';
+            window.location.href = getPostLoginRedirectUrl();
           }
         }, 1000);
       }, 700);
@@ -254,7 +255,7 @@ export function AuthModal({
               if (isAdo && window.location.search.includes('unauthorized_admin')) {
                 window.location.href = '/admin';
               } else {
-                window.location.href = '/dashboard';
+                window.location.href = getPostLoginRedirectUrl();
               }
             }
           }, 1200);
@@ -358,7 +359,7 @@ export function AuthModal({
               if (isAdminUser && window.location.search.includes('unauthorized_admin')) {
                 window.location.href = '/admin';
               } else {
-                window.location.href = '/dashboard';
+                window.location.href = getPostLoginRedirectUrl();
               }
             }
           }, 1000);
