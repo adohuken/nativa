@@ -24,6 +24,7 @@ export interface LearningMapProps {
   onB2C2Blocked?: (level: string) => void;
   isUserPremium?: boolean;
   onOpenPaywall?: (reason: string) => void;
+  isAdmin?: boolean;
 }
 
 export function LearningMap({
@@ -39,7 +40,8 @@ export function LearningMap({
   onSelectLesson,
   onStartLesson,
   onSubNodeClick,
-  onOpenTopicLibrary
+  onOpenTopicLibrary,
+  isAdmin
 }: LearningMapProps) {
   const filteredLessons = routeLevelFilter === 'ALL'
     ? lessons
@@ -47,6 +49,7 @@ export function LearningMap({
 
   const getNodeStatus = (lesson: IntensiveLesson): 'COMPLETED' | 'ACTIVE' | 'LOCKED' => {
     if (completedNodeIds.includes(lesson.id)) return 'COMPLETED';
+    if (isAdmin) return 'ACTIVE';
     if (!lesson.prerequisiteId) return 'ACTIVE';
     if (completedNodeIds.includes(lesson.prerequisiteId)) {
       // Verificar si los sub-nodos del nodo prerequisito están todos hechos
@@ -154,6 +157,7 @@ export function LearningMap({
               onStartLesson={onStartLesson}
               onSubNodeClick={onSubNodeClick}
               onOpenTopicLibrary={() => onOpenTopicLibrary(lesson)}
+              isAdmin={isAdmin}
             />
           );
         })}

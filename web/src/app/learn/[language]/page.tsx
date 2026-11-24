@@ -293,6 +293,13 @@ function FluentiaPathContent() {
   const [isUserPremium, setIsUserPremium] = useState<boolean>(() => AppStorage.isUserPremium());
   const [isPaywallActive, setIsPaywallActive] = useState<boolean>(() => AppStorage.getPaywallEnabled());
   const [userProfile, setUserProfile] = useState<UserProfile>(() => AppStorage.getUserProfile());
+  const isAdminUser = useMemo(() => {
+    return AppStorage.isAdmin() || Boolean(
+      userProfile?.isAdmin ||
+      userProfile?.email?.toLowerCase().includes('adohuken') ||
+      userProfile?.username?.toLowerCase().includes('adohuken')
+    );
+  }, [userProfile]);
   const [dailyMissionsState, setDailyMissionsState] = useState<DailyMissionsState>(() => AppStorage.getDailyMissions());
 
   // Navegación de Vistas del Dashboard: 'PATH' | 'IMMERSION' | 'SYLLABUS' | 'PROJECTS' | 'REVIEW'
@@ -1872,6 +1879,25 @@ function FluentiaPathContent() {
                     </span>
                   </button>
 
+                  {isAdminUser && (
+                    <Link
+                      href="/admin"
+                      onClick={() => {
+                        setIsAccountMenuOpen(false);
+                        soundManager.playClick();
+                      }}
+                      className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-amber-950/40 border border-amber-500/30 transition text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Panel cPanel Admin</span>
+                      </div>
+                      <span className="text-[9px] font-mono bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded font-black">
+                        ADMIN
+                      </span>
+                    </Link>
+                  )}
+
                   <div className="h-px bg-slate-800/80 my-1" />
 
                   <button
@@ -2160,6 +2186,23 @@ function FluentiaPathContent() {
       {/* ================= CONTENIDO CENTRAL ================= */}
       <div className="flex-1 flex flex-col min-w-0 md:pl-72 w-full">
 
+        {/* Banner de Modo Evaluador / Admin (adohuken) */}
+        {isAdminUser && (
+          <div className="w-full bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-b border-amber-500/40 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <div className="flex items-center gap-2 text-amber-300 font-bold">
+              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>👑 Modo Evaluador Activo: Tienes acceso total para revisar todas las lecciones, audios y tareas.</span>
+            </div>
+            <Link
+              href="/admin"
+              className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] transition flex items-center gap-1 shadow-sm"
+            >
+              <span>Ir a Panel Admin</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+        )}
+
         {/* VISTA 1: CAMINO UNIVERSITARIO DE APRENDIZAJE (MODULAR) */}
         {currentView === 'PATH' && (
           <LearningMap
@@ -2183,6 +2226,7 @@ function FluentiaPathContent() {
               setSelectedLibraryLesson(lesson);
               setIsLibraryOpen(true);
             }}
+            isAdmin={isAdminUser}
           />
         )}
 
@@ -3019,6 +3063,7 @@ function FluentiaPathContent() {
               }
             }}
             onToggleStarPhrase={handleToggleStarPhrase}
+            isAdmin={isAdminUser}
           />
         )}
       </AnimatePresence>

@@ -42,6 +42,7 @@ export interface NodeCardProps {
   onStartLesson: (lesson: IntensiveLesson) => void;
   onSubNodeClick: (subNode: SubNode) => void;
   onOpenTopicLibrary: () => void;
+  isAdmin?: boolean;
 }
 
 export function NodeCard({
@@ -63,12 +64,13 @@ export function NodeCard({
   onMouseLeave,
   onStartLesson,
   onSubNodeClick,
-  onOpenTopicLibrary
+  onOpenTopicLibrary,
+  isAdmin
 }: NodeCardProps) {
   const isCompleted = status === 'COMPLETED';
   const isActive = status === 'ACTIVE';
-  const isLocked = status === 'LOCKED';
-  const areSubNodesUnlocked = isCompleted;
+  const isLocked = status === 'LOCKED' && !isAdmin;
+  const areSubNodesUnlocked = isCompleted || Boolean(isAdmin);
 
   // Desplazamiento serpenteante adaptativo (sutil en móvil <360px para evitar desborde)
   const cycle = index % 3;
@@ -222,11 +224,19 @@ export function NodeCard({
                     <span>Comenzar Lección (6 Etapas)</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
-                ) : isLockedBySubNodes ? (
+                ) : isLockedBySubNodes && !isAdmin ? (
                   <div className="w-full text-[11px] text-amber-300 bg-amber-500/15 border border-amber-500/30 p-2 rounded-xl flex items-center gap-1.5 font-medium leading-tight">
                     <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                     <span>Completa los 3 sub-nodos de la Lección {prereqLessonCode} ({prereqSubNodesCount}/3)</span>
                   </div>
+                ) : isAdmin ? (
+                  <button
+                    onClick={() => onStartLesson(lesson)}
+                    className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:opacity-95 text-slate-950 font-black text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Revisar Lección (Acceso Evaluador)</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 ) : (
                   <div className="w-full text-center text-xs text-slate-500 font-mono py-1 flex items-center justify-center gap-1.5">
                     <Lock className="w-3.5 h-3.5" />

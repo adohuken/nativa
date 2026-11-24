@@ -222,12 +222,19 @@ CREATE POLICY "Historias globales insertables por usuarios autenticados"
 CREATE POLICY "Actualizar contador de lecturas en historias" 
   ON public.global_stories FOR UPDATE TO authenticated, anon USING (true);
 
--- Políticas para Project Submissions
+-- Políticas para Project Submissions (Alumnos ven lo suyo, Administradores ven todas)
 DROP POLICY IF EXISTS "Los usuarios pueden ver sus propios proyectos" ON public.project_submissions;
+DROP POLICY IF EXISTS "Los usuarios y administradores pueden ver proyectos" ON public.project_submissions;
 DROP POLICY IF EXISTS "Los usuarios pueden enviar sus propios proyectos" ON public.project_submissions;
 
-CREATE POLICY "Los usuarios pueden ver sus propios proyectos" 
-  ON public.project_submissions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Los usuarios y administradores pueden ver proyectos" 
+  ON public.project_submissions FOR SELECT USING (
+    auth.uid() = user_id 
+    OR EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND (is_admin = true OR email ILIKE '%adohuken%' OR username ILIKE '%adohuken%')
+    )
+  );
 
 CREATE POLICY "Los usuarios pueden enviar sus propios proyectos" 
   ON public.project_submissions FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -255,3 +262,10 @@ CREATE POLICY "Los usuarios pueden agregar palabras a su vocabulario"
 CREATE POLICY "Los usuarios pueden actualizar su propio vocabulario" 
   ON public.user_vocabulary FOR UPDATE TO authenticated, anon
   USING (auth.uid() = user_id OR user_id IS NOT NULL);
+
+-- ============================================================================
+-- ASIGNAR PERMISOS MAESTROS A USUARIO adohuken
+-- ============================================================================
+UPDATE public.profiles 
+SET is_admin = TRUE, is_premium = TRUE 
+WHERE email ILIKE '%adohuken%' OR username ILIKE '%adohuken%';

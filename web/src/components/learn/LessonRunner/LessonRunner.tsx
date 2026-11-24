@@ -21,6 +21,7 @@ export interface LessonRunnerProps {
   onClose: () => void;
   onComplete: (action: 'continue' | 'immersion') => void;
   onToggleStarPhrase: (line: { en: string; es?: string; phonetic?: string }, lesson: IntensiveLesson) => void;
+  isAdmin?: boolean;
 }
 
 export const LessonRunner: React.FC<LessonRunnerProps> = ({
@@ -29,6 +30,7 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
   onClose,
   onComplete,
   onToggleStarPhrase,
+  isAdmin,
 }) => {
   const activeTheme = LEVEL_THEMES[lesson.level] || LEVEL_THEMES['A1'];
 
@@ -491,9 +493,12 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
               const isDone = currentStep > stepNum;
               const isCurrent = currentStep === stepNum;
               return (
-                <div
+                <button
+                  type="button"
                   key={stepNum}
-                  className={`h-full rounded-full transition-all duration-300 ${isDone
+                  onClick={isAdmin ? () => setCurrentStep(stepNum) : undefined}
+                  title={isAdmin ? `Saltar a Etapa ${stepNum} (Modo Evaluador)` : `Etapa ${stepNum}`}
+                  className={`h-full rounded-full transition-all duration-300 ${isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-amber-400' : 'cursor-default'} ${isDone
                     ? activeTheme.progressDone
                     : isCurrent
                       ? `${activeTheme.progressCurrent} animate-pulse`

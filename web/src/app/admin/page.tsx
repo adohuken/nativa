@@ -46,7 +46,9 @@ import {
   Sliders,
   Crown,
   Building2,
-  CheckCheck
+  CheckCheck,
+  RefreshCw,
+  Award
 } from 'lucide-react';
 import { FluentiaLogo, NativaLogo } from '@/components/fluentia-logo';
 import { APP_NAME } from '@/lib/config';
@@ -92,7 +94,31 @@ import {
   PROVIDER_INFO
 } from '@/lib/ai-config';
 
-type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS' | 'AI_LIBRARY' | 'API_KEYS' | 'GLOBAL_CONFIG';
+type AdminTab = 'OVERVIEW' | 'CONTENT' | 'LANGUAGES' | 'AI_TOOLS' | 'AI_LIBRARY' | 'API_KEYS' | 'GLOBAL_CONFIG' | 'SUBMISSIONS';
+
+interface StudentSubmission {
+  id: string;
+  user_id: string;
+  unit: number;
+  level: string;
+  title: string;
+  content: string;
+  word_count: number;
+  overall_score: number;
+  rubric_scores: {
+    taskAchievement?: number;
+    coherenceCohesion?: number;
+    lexicalResource?: number;
+    grammaticalAccuracy?: number;
+  };
+  feedback: string;
+  created_at: string;
+  profiles?: {
+    name?: string;
+    email?: string;
+    username?: string;
+  };
+}
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -100,6 +126,51 @@ export default function AdminDashboardPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<AdminTab>('CONTENT');
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
+
+  // Estados para Entregas de Alumnos (SUBMISSIONS)
+  const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState<boolean>(false);
+  const [submissionSearch, setSubmissionSearch] = useState<string>('');
+  const [submissionLevelFilter, setSubmissionLevelFilter] = useState<string>('ALL');
+  const [selectedSubmission, setSelectedSubmission] = useState<StudentSubmission | null>(null);
+
+  const fetchSubmissions = async () => {
+    setIsLoadingSubmissions(true);
+    try {
+      const client = getSupabaseClient();
+      if (!client) {
+        setIsLoadingSubmissions(false);
+        return;
+      }
+      const { data, error } = await client
+        .from('project_submissions')
+        .select(`
+          id,
+          user_id,
+          unit,
+          level,
+          title,
+          content,
+          word_count,
+          overall_score,
+          rubric_scores,
+          feedback,
+          created_at,
+          profiles:user_id (name, email, username)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error al cargar entregas:', error);
+      } else if (data) {
+        setSubmissions(data as any);
+      }
+    } catch (err) {
+      console.error('Error fetching submissions:', err);
+    } finally {
+      setIsLoadingSubmissions(false);
+    }
+  };
 
   // Guardia de Seguridad: Verificación estricta de credenciales de Administrador
   useEffect(() => {
@@ -119,14 +190,22 @@ export default function AdminDashboardPage() {
           return;
         }
 
-        const userEmail = session.user.email?.toLowerCase().trim();
+        const userEmail = session.user.email?.toLowerCase().trim() || '';
         const { data: profile } = await client
           .from('profiles')
-          .select('is_admin, email')
+          .select('is_admin, email, username')
           .eq('id', session.user.id)
           .maybeSingle();
 
-        const isSuperAdmin = userEmail === 'adohuken2005@gmail.com';
+        const profileEmail = (profile?.email || '').toLowerCase().trim();
+        const profileUsername = (profile?.username || '').toLowerCase().trim();
+
+        const isSuperAdmin = Boolean(
+          userEmail === 'adohuken2005@gmail.com' ||
+          userEmail.includes('adohuken') ||
+          profileEmail.includes('adohuken') ||
+          profileUsername.includes('adohuken')
+        );
         const hasAdminRole = Boolean(profile?.is_admin || isSuperAdmin);
 
         if (!hasAdminRole) {
@@ -1235,6 +1314,21 @@ export default function AdminDashboardPage() {
           >
             <Sliders className="w-4 h-4 text-amber-400" />
             <span>Configuración Global & Paywall</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('SUBMISSIONS');
+              fetchSubmissions();
+              soundManager.playClick();
+            }}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left ${activeTab === 'SUBMISSIONS'
+              ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/10 border border-purple-500/40 text-purple-300 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+          >
+            <GraduationCap className="w-4 h-4 text-purple-400" />
+            <span>Entregas de Alumnos / Tareas</span>
           </button>
         </nav>
 
@@ -3319,6 +3413,221 @@ export default function AdminDashboardPage() {
 
               </div>
 
+            </div>
+          );
+        })()}
+
+        {/* ===================================================================
+            8. PESTAÑA: ENTREGAS Y TAREAS DE ALUMNOS (PROJECT SUBMISSIONS)
+        =================================================================== */}
+        {activeTab === 'SUBMISSIONS' && (() => {
+          const filteredSubmissions = submissions.filter(sub => {
+            const matchesLevel = submissionLevelFilter === 'ALL' || sub.level === submissionLevelFilter;
+            const query = submissionSearch.toLowerCase().trim();
+            if (!query) return matchesLevel;
+            const studentName = sub.profiles?.name?.toLowerCase() || '';
+            const studentEmail = sub.profiles?.email?.toLowerCase() || '';
+            const studentUname = sub.profiles?.username?.toLowerCase() || '';
+            const title = sub.title?.toLowerCase() || '';
+            const content = sub.content?.toLowerCase() || '';
+            return matchesLevel && (
+              studentName.includes(query) ||
+              studentEmail.includes(query) ||
+              studentUname.includes(query) ||
+              title.includes(query) ||
+              content.includes(query)
+            );
+          });
+
+          const totalSubmissions = submissions.length;
+          const avgScore = totalSubmissions > 0
+            ? Math.round(submissions.reduce((acc, s) => acc + (s.overall_score || 0), 0) / totalSubmissions)
+            : 0;
+
+          return (
+            <div className="p-6 md:p-8 space-y-6">
+              {/* Header de la pestaña */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-mono text-purple-400 font-bold uppercase tracking-wider mb-1">
+                    <GraduationCap className="w-4 h-4" />
+                    <span>Revisión de Producción Escrita • TBLT & Krashen</span>
+                  </div>
+                  <h1 className="text-xl md:text-2xl font-black text-white">
+                    Entregas de Alumnos y Tareas Evaluadas
+                  </h1>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Supervisa y evalúa los ensayos, proyectos finales de unidad y tareas enviados por los estudiantes.
+                  </p>
+                </div>
+
+                <button
+                  onClick={fetchSubmissions}
+                  disabled={isLoadingSubmissions}
+                  className="px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 font-bold text-xs flex items-center gap-2 cursor-pointer transition shadow-sm self-start sm:self-auto"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingSubmissions ? 'animate-spin' : ''}`} />
+                  <span>Actualizar Entregas</span>
+                </button>
+              </div>
+
+              {/* Métricas Resumen */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-[#090d18] border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Total Entregas</span>
+                  <div className="text-2xl font-black text-white">{totalSubmissions}</div>
+                  <span className="text-[11px] text-slate-400">Ensayos y tareas guardados</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#090d18] border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Promedio de Calificación</span>
+                  <div className="text-2xl font-black text-emerald-400">{avgScore} / 100</div>
+                  <span className="text-[11px] text-slate-400">Rúbrica IELTS / CEFR</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#090d18] border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Permisos de Acceso</span>
+                  <div className="text-sm font-black text-amber-400 flex items-center gap-1.5 pt-1">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>adohuken (Acceso Maestro)</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">Lectura y revisión completa</span>
+                </div>
+              </div>
+
+              {/* Filtros y Buscador */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-2xl bg-[#090d18] border border-slate-800">
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por estudiante, correo o título..."
+                    value={submissionSearch}
+                    onChange={(e) => setSubmissionSearch(e.target.value)}
+                    className="w-full bg-[#060a12] border border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                  {['ALL', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setSubmissionLevelFilter(lvl)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition font-mono ${
+                        submissionLevelFilter === lvl
+                          ? 'bg-purple-500 text-white shadow-sm'
+                          : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {lvl === 'ALL' ? 'Todos' : lvl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lista de Entregas */}
+              {isLoadingSubmissions ? (
+                <div className="py-16 text-center space-y-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin mx-auto" />
+                  <p className="text-xs font-mono text-slate-400">Cargando proyectos y entregas de Supabase...</p>
+                </div>
+              ) : filteredSubmissions.length === 0 ? (
+                <div className="py-16 text-center p-8 rounded-2xl bg-[#090d18] border border-slate-800 space-y-3">
+                  <FileText className="w-10 h-10 text-slate-600 mx-auto" />
+                  <h4 className="text-sm font-bold text-slate-300">No se encontraron entregas de alumnos</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    {submissionSearch || submissionLevelFilter !== 'ALL'
+                      ? 'Ninguna entrega coincide con los filtros aplicados.'
+                      : 'Aún ningún estudiante ha enviado proyectos o tareas en esta base de datos.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredSubmissions.map((sub) => {
+                    const studentLabel = sub.profiles?.name || sub.profiles?.email || 'Estudiante';
+                    const score = sub.overall_score || 0;
+                    const scoreBadgeColor = score >= 80 ? 'text-emerald-400 border-emerald-500/40 bg-emerald-950/30' : score >= 60 ? 'text-amber-400 border-amber-500/40 bg-amber-950/30' : 'text-rose-400 border-rose-500/40 bg-rose-950/30';
+
+                    return (
+                      <div
+                        key={sub.id}
+                        className="p-5 rounded-2xl bg-[#090d18] border border-slate-800 hover:border-slate-700 transition space-y-4 shadow-sm"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-purple-950/60 border border-purple-500/30 flex items-center justify-center font-bold font-mono text-purple-300">
+                              U{sub.unit}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-white">{sub.title}</span>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold border border-slate-700">
+                                  Nivel {sub.level}
+                                </span>
+                              </div>
+                              <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
+                                <span>Alumno: <strong className="text-slate-200">{studentLabel}</strong> ({sub.profiles?.email || 'Sin email'})</span>
+                                <span>•</span>
+                                <span>{sub.word_count || 0} palabras</span>
+                                <span>•</span>
+                                <span>{new Date(sub.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-black flex items-center gap-1.5 self-start sm:self-auto ${scoreBadgeColor}`}>
+                            <Award className="w-4 h-4" />
+                            <span>Puntaje: {score} / 100</span>
+                          </div>
+                        </div>
+
+                        {/* Texto del Estudiante */}
+                        <div className="p-4 rounded-xl bg-[#050811] border border-slate-800/90 space-y-2">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold block">
+                            Texto Producido por el Alumno:
+                          </span>
+                          <p className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed font-sans">
+                            {sub.content}
+                          </p>
+                        </div>
+
+                        {/* Rúbricas y Feedback */}
+                        {sub.rubric_scores && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
+                            <div className="p-2 rounded-lg bg-[#060a12] border border-slate-800">
+                              <span className="text-slate-500 block text-[9px]">Cumplimiento Tarea:</span>
+                              <span className="font-bold text-purple-300">{sub.rubric_scores.taskAchievement || 0} / 25</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-[#060a12] border border-slate-800">
+                              <span className="text-slate-500 block text-[9px]">Coherencia y Cohesión:</span>
+                              <span className="font-bold text-cyan-300">{sub.rubric_scores.coherenceCohesion || 0} / 25</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-[#060a12] border border-slate-800">
+                              <span className="text-slate-500 block text-[9px]">Recurso Léxico:</span>
+                              <span className="font-bold text-emerald-300">{sub.rubric_scores.lexicalResource || 0} / 25</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-[#060a12] border border-slate-800">
+                              <span className="text-slate-500 block text-[9px]">Precisión Gramatical:</span>
+                              <span className="font-bold text-amber-300">{sub.rubric_scores.grammaticalAccuracy || 0} / 25</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {sub.feedback && (
+                          <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-1">
+                            <span className="text-[10px] font-mono font-bold text-purple-300 uppercase block">
+                              Retroalimentación y Correcciones:
+                            </span>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              {sub.feedback}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })()}

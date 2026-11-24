@@ -197,6 +197,16 @@ export function AuthModal({
             hasSeenTour: false
           });
 
+          const isAdo = profile.email.toLowerCase().includes('adohuken') ||
+            ((profile as any).username || '').toLowerCase().includes('adohuken');
+
+          if (isAdo) {
+            profile.is_admin = true;
+            try {
+              document.cookie = 'nativa_admin_session=true; path=/; max-age=604800; SameSite=Lax';
+            } catch {}
+          }
+
           // Resetear estado del tour para que el nuevo usuario lo vea en su Dashboard
           AppStorage.setHasSeenTour(false);
 
@@ -209,7 +219,8 @@ export function AuthModal({
               current_level: profile.current_level,
               xp: 0,
               streak: 0,
-              is_premium: profile.is_premium,
+              is_premium: profile.is_premium || isAdo,
+              is_admin: isAdo,
               has_seen_tour: false,
               updated_at: new Date().toISOString()
             });
@@ -228,12 +239,23 @@ export function AuthModal({
 
           soundManager.playVictory();
           setSuccessMessage('✓ ¡Cuenta creada e iniciada exitosamente!');
-          try { localStorage.setItem('nativa_should_show_placement', 'true'); } catch {}
+          try {
+            localStorage.setItem('nativa_should_show_placement', 'true');
+            localStorage.setItem('fluentia_user_session', JSON.stringify({
+              id: profile.id,
+              email: profile.email,
+              role: isAdo ? 'ADMIN' : 'STUDENT'
+            }));
+          } catch {}
           if (onAuthSuccess) onAuthSuccess(profile);
           setTimeout(() => {
             onClose();
             if (typeof window !== 'undefined') {
-              window.location.href = '/dashboard';
+              if (isAdo && window.location.search.includes('unauthorized_admin')) {
+                window.location.href = '/admin';
+              } else {
+                window.location.href = '/dashboard';
+              }
             }
           }, 1200);
         } else if (data.user) {
@@ -299,7 +321,14 @@ export function AuthModal({
             AppStorage.setHasSeenTour(Boolean(profileData.has_seen_tour));
           }
 
-          const isAdminUser = Boolean(profileData.is_admin || profileData.email === 'adohuken2005@gmail.com');
+          const userEmail = (profileData.email || data.user.email || '').toLowerCase().trim();
+          const userUname = ((profileData as any).username || '').toLowerCase().trim();
+          const isAdminUser = Boolean(
+            profileData.is_admin ||
+            userEmail.includes('adohuken') ||
+            userUname.includes('adohuken') ||
+            userEmail === 'adohuken2005@gmail.com'
+          );
           try {
             if (isAdminUser) {
               document.cookie = 'nativa_admin_session=true; path=/; max-age=604800; SameSite=Lax';

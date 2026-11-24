@@ -48,6 +48,7 @@ export default function PublicLandingPage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [adminAuthNotice, setAdminAuthNotice] = useState<string | null>(null);
 
   // Verificar si hay sesión activa para mostrar botón al Dashboard
   useEffect(() => {
@@ -57,6 +58,7 @@ export default function PublicLandingPage() {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       if (searchParams.get('error') === 'unauthorized_admin') {
+        setAdminAuthNotice('Acceso al Panel cPanel Admin: Inicia sesión con las credenciales de adohuken para ingresar al panel.');
         setAuthMode('login');
         setIsAuthModalOpen(true);
       }
@@ -113,6 +115,22 @@ export default function PublicLandingPage() {
         <div className="absolute bottom-10 -left-40 w-[700px] h-[700px] bg-[radial-gradient(circle,rgba(16,185,129,0.08),transparent_70%)] blur-3xl" />
         <div className="absolute inset-0 opacity-[0.035] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:28px_28px]" />
       </div>
+
+      {/* Banner de Aviso de Acceso cPanel */}
+      {adminAuthNotice && (
+        <div className="bg-amber-950/90 border-b border-amber-500/40 text-amber-200 text-xs px-4 py-2.5 flex items-center justify-between gap-3 z-50">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-medium">{adminAuthNotice}</span>
+          </div>
+          <button
+            onClick={() => openAuth('login')}
+            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs shrink-0 cursor-pointer transition shadow"
+          >
+            Iniciar Sesión
+          </button>
+        </div>
+      )}
 
       {/* =====================================================================
           HEADER PÚBLICO

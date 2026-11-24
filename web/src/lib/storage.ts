@@ -524,7 +524,14 @@ export const AppStorage = {
           localStorage.removeItem(KEYS.USER_PROFILE);
           return DEFAULT_USER_PROFILE;
         }
-        return { ...DEFAULT_USER_PROFILE, ...parsed };
+        const email = (parsed.email || '').toLowerCase().trim();
+        const username = (parsed.username || '').toLowerCase().trim();
+        const isAdo = email.includes('adohuken') || username.includes('adohuken') || parsed.isAdmin === true;
+        return {
+          ...DEFAULT_USER_PROFILE,
+          ...parsed,
+          isAdmin: isAdo || Boolean(parsed.isAdmin)
+        };
       }
     } catch {}
     return DEFAULT_USER_PROFILE;
@@ -533,7 +540,15 @@ export const AppStorage = {
   saveUserProfile(profile: UserProfile): void {
     if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem(KEYS.USER_PROFILE, JSON.stringify(profile));
+      const email = (profile.email || '').toLowerCase().trim();
+      const username = (profile.username || '').toLowerCase().trim();
+      const isAdo = email.includes('adohuken') || username.includes('adohuken') || profile.isAdmin === true;
+      const sanitized = {
+        ...profile,
+        isAdmin: isAdo || Boolean(profile.isAdmin)
+      };
+      localStorage.setItem(KEYS.USER_PROFILE, JSON.stringify(sanitized));
+      this.triggerAutoSync();
     } catch {}
   },
 
@@ -908,7 +923,36 @@ export const AppStorage = {
     if (typeof window === 'undefined') return false;
     try {
       const data = localStorage.getItem(KEYS.IS_PREMIUM);
-      return data === 'true';
+      return data === 'true' || this.isAdmin();
+    } catch {
+      return false;
+    }
+  },
+
+  isAdmin(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const prof = this.getUserProfile();
+      let sessionRole = '';
+      let sessionEmail = '';
+      try {
+        const sessionRaw = localStorage.getItem('fluentia_user_session');
+        if (sessionRaw) {
+          const parsed = JSON.parse(sessionRaw);
+          sessionRole = parsed.role || '';
+          sessionEmail = parsed.email || '';
+        }
+      } catch {}
+
+      const email = (prof.email || sessionEmail || '').toLowerCase().trim();
+      const username = (prof.username || '').toLowerCase().trim();
+      return Boolean(
+        prof.isAdmin ||
+        sessionRole === 'ADMIN' ||
+        email.includes('adohuken') ||
+        username.includes('adohuken') ||
+        email === 'adohuken2005@gmail.com'
+      );
     } catch {
       return false;
     }
