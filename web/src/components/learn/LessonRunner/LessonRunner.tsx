@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Zap, Keyboard, ChevronRight, Volume2, Sparkles,
+  X, Zap, Keyboard, ChevronRight, ChevronLeft, ArrowLeft, Volume2, Sparkles,
   CheckCircle2, RotateCcw, Mic, Star,
   ArrowRight, BookOpen, VolumeX, Eye, EyeOff, Trophy,
   Activity, Headphones, Bot, User, Compass, Play, Pause, Square
@@ -1780,23 +1780,51 @@ export const LessonRunner: React.FC<LessonRunnerProps> = ({
 
       {/* Bottom Bar de Navegación entre Etapas */}
       {!lessonFinished && (
-        <footer className="border-t border-slate-800 px-4 md:px-8 py-3.5 bg-[#090d16]/95 backdrop-blur-xl flex items-center justify-between shadow-xs">
-          <button
-            onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-            disabled={currentStep === 1}
-            className="px-4 py-2 rounded-xl bg-[#0c111c] text-slate-300 hover:bg-slate-800 hover:text-white text-xs font-bold disabled:opacity-20 transition border border-slate-700"
-          >
-            ← Etapa Anterior
-          </button>
+        <footer className="border-t border-slate-800 px-4 md:px-8 py-3.5 bg-[#090d16]/95 backdrop-blur-xl flex items-center justify-between shadow-xs z-30">
+          <div className="flex items-center gap-2">
+            {currentStep > 1 ? (
+              <button
+                onClick={() => {
+                  setCurrentStep((prev) => Math.max(1, prev - 1));
+                  soundManager.playClick();
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-white font-bold text-xs transition border border-slate-600 hover:border-slate-400 shadow-md cursor-pointer ring-1 ring-slate-700/50"
+                title="Regresar a la etapa anterior"
+              >
+                <ChevronLeft className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
+                <span className="font-extrabold tracking-wide">Etapa Anterior</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  onClose();
+                  soundManager.playClick();
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 hover:text-white font-bold text-xs transition border border-slate-600 hover:border-slate-400 shadow-sm cursor-pointer"
+                title="Volver a la ruta de aprendizaje"
+              >
+                <ArrowLeft className="w-4 h-4 text-emerald-400" />
+                <span>Volver a la Ruta</span>
+              </button>
+            )}
+          </div>
 
-          <button
-            onClick={() => setCurrentStep((prev) => Math.min(6, prev + 1))}
-            disabled={currentStep === 6}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r ${activeTheme.btnGradient} ${activeTheme.btnText} font-black text-xs transition shadow-md hover:opacity-95 disabled:opacity-20`}
-          >
-            <span>Siguiente Etapa</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-xs font-mono font-semibold text-slate-400">
+              Etapa {currentStep} de 6
+            </span>
+            <button
+              onClick={() => {
+                setCurrentStep((prev) => Math.min(6, prev + 1));
+                soundManager.playClick();
+              }}
+              disabled={currentStep === 6}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r ${activeTheme.btnGradient} ${activeTheme.btnText} font-black text-xs transition shadow-md hover:opacity-95 disabled:opacity-30 cursor-pointer`}
+            >
+              <span>Siguiente Etapa</span>
+              <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+            </button>
+          </div>
         </footer>
       )}
 
